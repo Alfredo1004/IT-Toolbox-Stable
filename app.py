@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_file, send_from_directory
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_file, send_from_directory, flash
 from werkzeug.security import check_password_hash
 import sqlite3, json, os, pandas as pd
 from functools import wraps
@@ -22,7 +22,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# --- RUTA DEL AGENTE ---
+# --- RUTA DEL AGENTE (HARDWARE + SOFTWARE) ---
 @app.route('/reporte_agente', methods=['POST'])
 def reporte_agente():
     data = request.get_json()
@@ -31,7 +31,8 @@ def reporte_agente():
     ip = data.get('ip_v4', '0.0.0.0'); mac = data.get('mac', 'N/A')
     specs = f"RAM: {data.get('ram_total')} | Disco: {data.get('disco_total')}"
     serie = data.get('n_serie', 'N/A'); marca = data.get('marca', 'N/A'); modelo = data.get('modelo', 'N/A')
-    
+    software_recibido = data.get('software', [])
+
     conn = conectar_db(); cursor = conn.cursor()
     if mac and mac != "N/A":
         cursor.execute("SELECT id FROM inventario WHERE mac_address = ?", (mac,))
@@ -46,11 +47,25 @@ def reporte_agente():
         cursor.execute("""INSERT INTO inventario (nombre_equipo, usuario, especificaciones, ip_address, n_serie, marca, modelo, mac_address, tipo_red, ubicacion) VALUES (?,?,?,?,?,?,?,?,?,?)""", 
                        (hostname, usuario, specs, ip, serie, marca, modelo, mac, 'Ethernet', 'Monterrey'))
     
+    # ACTUALIZACIÓN DE SOFTWARE
+    cursor.execute("DELETE FROM software_inventario WHERE nombre_equipo = ?", (hostname,))
+    for s in software_recibido:
+        cursor.execute("INSERT INTO software_inventario (nombre_equipo, nombre_software, version, fecha_escaneo) VALUES (?,?,?,?)",
+                       (hostname, s['nombre'], s['version'], datetime.now().strftime('%Y-%m-%d')))
+
     info_json = json.dumps({"equipo": hostname, "ram": data.get('ram_uso'), "disco": data.get('disco_libre')})
     cursor.execute("INSERT INTO incidencias (equipo, usuario, problema, solucion, fecha) VALUES (?,?,?,?,?)", 
-                   (info_json, usuario, "Diagnóstico automático", "Pendiente", datetime.now().strftime('%Y-%m-%d %H:%M')))
+                   (info_json, usuario, "Auditoría de Hardware y Software", "Pendiente", datetime.now().strftime('%Y-%m-%d %H:%M')))
     conn.commit(); conn.close()
     return jsonify({"status": "success"}), 200
+
+# --- CONSULTA SOFTWARE ---
+@app.route('/ver_software/<hostname>')
+@login_required
+def ver_software(hostname):
+    conn = conectar_db(); cursor = conn.cursor()
+    cursor.execute("SELECT * FROM software_inventario WHERE nombre_equipo = ? ORDER BY nombre_software ASC", (hostname,))
+    sw = [dict(ix) for ix in cursor.fetchall()]; conn.close(); return jsonify(sw)
 
 # --- DASHBOARD PRINCIPAL ---
 @app.route('/')
@@ -59,7 +74,7 @@ def dashboard():
     conn = conectar_db(); cursor = conn.cursor(); hoy = datetime.now().strftime('%Y-%m-%d')
     cursor.execute("SELECT COUNT(*) FROM inventario"); total_eq = cursor.fetchone()[0]
     cursor.execute("SELECT COUNT(*) FROM incidencias WHERE solucion = 'Pendiente'"); pend = cursor.fetchone()[0]
-    cursor.execute("SELECT COUNT(*) FROM mantenimiento WHERE proxima_fecha < ? AND proxima_fecha != ''", (hoy,)); venc = cursor.fetchone()[0]
+    cursor.execute("""SELECT COUNT(*) FROM mantenimiento WHERE proxima_fecha < ? AND proxima_fecha != '' AND proxima_fecha IS NOT NULL""", (hoy,)); venc = cursor.fetchone()[0]
 
     cursor.execute("SELECT * FROM incidencias ORDER BY id DESC")
     t_procesados = []
@@ -79,16 +94,62 @@ def dashboard():
     cursor.execute("SELECT * FROM wiki ORDER BY categoria ASC, titulo ASC"); wiki = cursor.fetchall()
     
     cursor.execute("SELECT COUNT(*) FROM incidencias WHERE solucion = 'Solucionado'"); sol = cursor.fetchone()[0]
-    stats_tickets = [sol, pend]
-    stats_manto = [len(manto)]
-    
+    stats_tickets = [sol, pend]; stats_manto = [len(manto)]
     conn.close()
     return render_template('toolbox.html', resumen={'equipos': total_eq, 'pendientes': pend, 'vencidos': venc},
                            tickets=t_procesados, equipos=equipos, claves=claves, mantenimientos=manto, 
                            notas=notas, prestamos=prestamos, wiki=wiki, fecha_actual=hoy, 
                            stats_tickets=stats_tickets, stats_manto=stats_manto, pendientes_count=pend)
 
-# --- RUTAS DE GESTIÓN MANTENIDAS ---
+# --- LOGIN ACTUALIZADO ---
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        u, p = request.form.get('username'), request.form.get('password')
+        conn = conectar_db(); cursor = conn.cursor()
+        cursor.execute("SELECT id, password FROM usuarios WHERE username = ?", (u,))
+        res = cursor.fetchone(); conn.close()
+        if res and check_password_hash(res['password'], p):
+            session['user_id'], session['username'] = res['id'], u
+            flash("¡Inicio de sesión exitoso! Bienvenido al sistema.", "success")
+            return redirect(url_for('dashboard'))
+        flash("Usuario o contraseña incorrectos. Intente de nuevo.", "danger")
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout(): session.clear(); return redirect(url_for('login'))
+
+# --- RUTAS DE ACCIONES (ESTABLES) ---
+@app.route('/actualizar_ticket/<int:id>', methods=['POST'])
+@login_required
+def actualizar_ticket(id):
+    conn = conectar_db(); conn.execute("UPDATE incidencias SET solucion = ?, comentarios = ? WHERE id = ?", (request.form['estado'], request.form['comentario'], id)); conn.commit(); conn.close(); return redirect('/#tickets')
+
+@app.route('/eliminar_ticket/<int:id>')
+@login_required
+def eliminar_ticket(id):
+    conn = conectar_db(); conn.execute("DELETE FROM incidencias WHERE id=?", (id,)); conn.commit(); conn.close(); return redirect('/#tickets')
+
+@app.route('/actualizar_equipo/<int:id>', methods=['POST'])
+@login_required
+def actualizar_equipo(id):
+    conn = conectar_db(); conn.execute("""UPDATE inventario SET nombre_equipo=?, usuario=?, n_serie=?, marca=?, modelo=?, ubicacion=?, fecha_asignacion=?, ip_address=?, tipo_red=?, especificaciones=? WHERE id=?""", (request.form['nombre'], request.form['usuario'], request.form['serie'], request.form['marca'], request.form['modelo'], request.form['ubicacion'], request.form['fecha_asig'], request.form['ip'], request.form['red'], request.form['specs'], id)); conn.commit(); conn.close(); return redirect('/#inventario')
+
+@app.route('/eliminar_equipo/<int:id>')
+@login_required
+def eliminar_equipo(id):
+    conn = conectar_db(); conn.execute("DELETE FROM inventario WHERE id=?", (id,)); conn.commit(); conn.close(); return redirect('/#inventario')
+
+@app.route('/actualizar_clave/<int:id>', methods=['POST'])
+@login_required
+def actualizar_clave(id):
+    conn = conectar_db(); conn.execute("UPDATE boveda SET servicio=?, usuario_acceso=?, password_acceso=?, link_url=? WHERE id=?", (request.form['servicio'], request.form['usuario'], request.form['password'], request.form['url'], id)); conn.commit(); conn.close(); return redirect('/#boveda')
+
+@app.route('/eliminar_clave/<int:id>')
+@login_required
+def eliminar_clave(id):
+    conn = conectar_db(); conn.execute("DELETE FROM boveda WHERE id=?", (id,)); conn.commit(); conn.close(); return redirect('/#boveda')
+
 @app.route('/agregar_wiki', methods=['POST'])
 @login_required
 def agregar_wiki():
@@ -104,15 +165,20 @@ def editar_wiki(id):
 def eliminar_wiki(id):
     conn = conectar_db(); conn.execute("DELETE FROM wiki WHERE id=?", (id,)); conn.commit(); conn.close(); return redirect('/#wiki')
 
-@app.route('/actualizar_ticket/<int:id>', methods=['POST'])
+@app.route('/agregar_mantenimiento', methods=['POST'])
 @login_required
-def actualizar_ticket(id):
-    conn = conectar_db(); conn.execute("UPDATE incidencias SET solucion = ?, comentarios = ? WHERE id = ?", (request.form['estado'], request.form['comentario'], id)); conn.commit(); conn.close(); return redirect('/#tickets')
+def agregar_mantenimiento():
+    conn = conectar_db(); conn.execute("INSERT INTO mantenimiento (equipo_id, fecha_realizado, tecnico, descripcion, proxima_fecha) VALUES (?,?,?,?,?)", (request.form['equipo_id'], request.form['fecha'], session['username'], request.form['description'], request.form['proxima_fecha'])); conn.commit(); conn.close(); return redirect('/#mantenimiento')
 
-@app.route('/eliminar_ticket/<int:id>')
+@app.route('/actualizar_mantenimiento/<int:id>', methods=['POST'])
 @login_required
-def eliminar_ticket(id):
-    conn = conectar_db(); conn.execute("DELETE FROM incidencias WHERE id=?", (id,)); conn.commit(); conn.close(); return redirect('/#tickets')
+def actualizar_mantenimiento(id):
+    conn = conectar_db(); conn.execute("UPDATE mantenimiento SET fecha_realizado=?, proxima_fecha=?, descripcion=? WHERE id=?", (request.form['fecha'], request.form['proxima_fecha'], request.form['description'], id)); conn.commit(); conn.close(); return redirect('/#mantenimiento')
+
+@app.route('/eliminar_mantenimiento/<int:id>')
+@login_required
+def eliminar_mantenimiento(id):
+    conn = conectar_db(); conn.execute("DELETE FROM mantenimiento WHERE id=?", (id,)); conn.commit(); conn.close(); return redirect('/#mantenimiento')
 
 @app.route('/agregar_prestamo', methods=['POST'])
 @login_required
@@ -139,60 +205,20 @@ def agregar_nota():
 def eliminar_nota(id):
     conn = conectar_db(); conn.execute("DELETE FROM notas WHERE id=?", (id,)); conn.commit(); conn.close(); return redirect('/')
 
-@app.route('/actualizar_equipo/<int:id>', methods=['POST'])
-@login_required
-def actualizar_equipo(id):
-    conn = conectar_db(); conn.execute("""UPDATE inventario SET nombre_equipo=?, usuario=?, n_serie=?, marca=?, modelo=?, ubicacion=?, fecha_asignacion=?, ip_address=?, tipo_red=?, especificaciones=? WHERE id=?""", (request.form['nombre'], request.form['usuario'], request.form['serie'], request.form['marca'], request.form['modelo'], request.form['ubicacion'], request.form['fecha_asig'], request.form['ip'], request.form['red'], request.form['specs'], id)); conn.commit(); conn.close(); return redirect('/#inventario')
-
-@app.route('/eliminar_equipo/<int:id>')
-@login_required
-def eliminar_equipo(id):
-    conn = conectar_db(); conn.execute("DELETE FROM inventario WHERE id=?", (id,)); conn.commit(); conn.close(); return redirect('/#inventario')
-
-@app.route('/agregar_clave', methods=['POST'])
-@login_required
-def agregar_clave():
-    conn = conectar_db(); conn.execute("INSERT INTO boveda (servicio, usuario_acceso, password_acceso, link_url) VALUES (?,?,?,?)", (request.form['servicio'], request.form['usuario'], request.form['password'], request.form['url'])); conn.commit(); conn.close(); return redirect('/#boveda')
-
-@app.route('/actualizar_clave/<int:id>', methods=['POST'])
-@login_required
-def actualizar_clave(id):
-    conn = conectar_db(); conn.execute("UPDATE boveda SET servicio=?, usuario_acceso=?, password_acceso=?, link_url=? WHERE id=?", (request.form['servicio'], request.form['usuario'], request.form['password'], request.form['url'], id)); conn.commit(); conn.close(); return redirect('/#boveda')
-
-@app.route('/eliminar_clave/<int:id>')
-@login_required
-def eliminar_clave(id):
-    conn = conectar_db(); conn.execute("DELETE FROM boveda WHERE id=?", (id,)); conn.commit(); conn.close(); return redirect('/#boveda')
-
-@app.route('/agregar_mantenimiento', methods=['POST'])
-@login_required
-def agregar_mantenimiento():
-    conn = conectar_db(); conn.execute("INSERT INTO mantenimiento (equipo_id, fecha_realizado, tecnico, descripcion, proxima_fecha) VALUES (?,?,?,?,?)", (request.form['equipo_id'], request.form['fecha'], session['username'], request.form['description'], request.form['proxima_fecha'])); conn.commit(); conn.close(); return redirect('/#mantenimiento')
-
-@app.route('/actualizar_mantenimiento/<int:id>', methods=['POST'])
-@login_required
-def actualizar_mantenimiento(id):
-    conn = conectar_db(); conn.execute("UPDATE mantenimiento SET fecha_realizado=?, proxima_fecha=?, descripcion=? WHERE id=?", (request.form['fecha'], request.form['proxima_fecha'], request.form['description'], id)); conn.commit(); conn.close(); return redirect('/#mantenimiento')
-
-@app.route('/eliminar_mantenimiento/<int:id>')
-@login_required
-def eliminar_mantenimiento(id):
-    conn = conectar_db(); conn.execute("DELETE FROM mantenimiento WHERE id=?", (id,)); conn.commit(); conn.close(); return redirect('/#mantenimiento')
-
 @app.route('/crear_incidencia_manual', methods=['POST'])
 @login_required
 def crear_incidencia_manual():
     conn = conectar_db(); conn.execute("INSERT INTO incidencias (equipo, usuario, problema, solucion, fecha) VALUES (?,?,?,?,?)", (request.form['equipo_nombre'], request.form['usuario'], request.form['problema'], 'Pendiente', datetime.now().strftime('%Y-%m-%d %H:%M'))); conn.commit(); conn.close(); return redirect('/#tickets')
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        u, p = request.form.get('username'), request.form.get('password'); conn = conectar_db(); cursor = conn.cursor(); cursor.execute("SELECT id, password FROM usuarios WHERE username = ?", (u,)); res = cursor.fetchone(); conn.close()
-        if res and check_password_hash(res['password'], p): session['user_id'], session['username'] = res['id'], u; return redirect(url_for('dashboard'))
-    return render_template('login.html')
+@app.route('/agregar_equipo', methods=['POST'])
+@login_required
+def agregar_equipo():
+    conn = conectar_db(); conn.execute("""INSERT INTO inventario (nombre_equipo, usuario, especificaciones, ip_address, tipo_red, n_serie, marca, modelo, ubicacion, fecha_asignacion) VALUES (?,?,?,?,?,?,?,?,?,?)""", (request.form['nombre'], request.form['usuario'], request.form['specs'], request.form['ip'], request.form['red'], request.form['serie'], request.form['marca'], request.form['modelo'], request.form['ubicacion'], request.form['fecha_asig'])); conn.commit(); conn.close(); return redirect('/#inventario')
 
-@app.route('/logout')
-def logout(): session.clear(); return redirect(url_for('login'))
+@app.route('/agregar_clave', methods=['POST'])
+@login_required
+def agregar_clave():
+    conn = conectar_db(); conn.execute("INSERT INTO boveda (servicio, usuario_acceso, password_acceso, link_url) VALUES (?,?,?,?)", (request.form['servicio'], request.form['usuario'], request.form['password'], request.form['url'])); conn.commit(); conn.close(); return redirect('/#boveda')
 
 @app.route('/descargar_agente')
 @login_required

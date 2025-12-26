@@ -1,5 +1,14 @@
+# Carpetas de compilación de Python y PyInstaller
+build/
+dist/
 __pycache__/
-*.pyc
+
+# Archivos de configuración de PyInstaller
+*.spec
+*.toc
+
+# Entorno virtual
 venv/
-.env
-static/descargas/*.exe
+
+# Reportes temporales
+*.xlsx
