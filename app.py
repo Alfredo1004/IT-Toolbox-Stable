@@ -11,7 +11,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'descargas')
 
 def conectar_db():
-    conn = sqlite3.connect('soporte.db', check_same_thread=False)
+    # Esto asegura que busque la DB en la misma carpeta donde está app.py
+    db_path = os.path.join(BASE_DIR, 'soporte.db') 
+    conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
