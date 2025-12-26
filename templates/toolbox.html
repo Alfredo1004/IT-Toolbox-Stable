@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>IT Toolbox Pro | Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --it-side: #0f172a; --it-active: #2563eb; }
+        body { background-color: #f1f5f9; font-family: 'Segoe UI', sans-serif; overflow-x: hidden; }
+        .sidebar { background: var(--it-side); color: white; min-height: 100vh; position: fixed; width: 250px; padding: 25px; z-index: 1000; display: flex; flex-direction: column; }
+        .main-content { margin-left: 250px; padding: 40px; width: calc(100% - 250px); }
+        .nav-link { color: #94a3b8; margin-bottom: 10px; border-radius: 8px; padding: 12px; transition: 0.3s; text-decoration: none; display: block; border: none; width: 100%; text-align: left; }
+        .nav-link:hover, .nav-link.active { background: var(--it-active); color: white !important; }
+        .sidebar p.text-muted, .sidebar .text-muted, .sidebar small { color: #cbd5e1 !important; opacity: 1 !important; }
+        .card-custom { border: none; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); background: white; }
+        .card-stat { border: none; border-radius: 20px; transition: 0.3s; background: white; }
+        .card-stat:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .icon-shape { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+        .pass-box { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; }
+        .search-input { border-radius: 20px; border: 1px solid #e2e8f0; padding-left: 35px; background: white; height: 45px; }
+        code.mac-style { font-size: 0.75rem; color: #64748b; background: #f8fafc; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0; }
+        .table-small-text { font-size: 0.85rem; }
+        .wiki-card { border-left: 5px solid #2563eb; transition: 0.2s; }
+        .wiki-content { white-space: pre-wrap; font-size: 0.9rem; color: #334155; }
+    </style>
+</head>
+<body>
+
+<audio id="notifSound" preload="auto"><source src="/static/sounds/notify.mp3" type="audio/mpeg"></audio>
+
+<div class="sidebar">
+    <h4 class="fw-bold mb-2"><i class="fas fa-toolbox text-primary me-2"></i> IT Toolbox</h4>
+    <p class="small text-muted mb-4" style="font-size: 0.7rem;">SISTEMA DE GESTIÓN TÉCNICA</p>
+    <a href="/descargar_agente" class="btn btn-primary btn-sm w-100 mb-2 rounded-pill fw-bold py-2 shadow-sm"><i class="fas fa-download me-1"></i> Bajar Agente</a>
+    <a href="/backup_db" class="btn btn-outline-light btn-sm w-100 mb-4 rounded-pill py-2 shadow-sm" style="font-size: 0.7rem; border-color: #334155;"><i class="fas fa-database me-1"></i> Backup BD</a>
+    
+    <nav class="nav flex-column nav-pills" id="v-pills-tab" role="tablist">
+        <a class="nav-link active d-flex justify-content-between align-items-center" data-bs-toggle="pill" href="#tickets">
+            <span><i class="fas fa-ticket-alt me-2"></i>Incidencias</span>
+            <span id="sidebar-pend-badge" class="badge rounded-pill bg-danger shadow-sm {% if resumen.pendientes == 0 %}d-none{% endif %}">{{ resumen.pendientes }}</span>
+        </a>
+        <a class="nav-link" data-bs-toggle="pill" href="#inventario"><i class="fas fa-laptop me-2"></i>Inventario</a>
+        <a class="nav-link" data-bs-toggle="pill" href="#boveda"><i class="fas fa-key me-2"></i>Bóveda Claves</a>
+        <a class="nav-link" data-bs-toggle="pill" href="#prestamos"><i class="fas fa-hand-holding-heart me-2"></i>Préstamos</a>
+        <a class="nav-link" data-bs-toggle="pill" href="#wiki"><i class="fas fa-book-open me-2"></i>Wiki Técnica</a>
+        <a class="nav-link" data-bs-toggle="pill" href="#mantenimiento"><i class="fas fa-tools me-2"></i>Mantenimiento</a>
+        <a class="nav-link" data-bs-toggle="pill" href="#reportes"><i class="fas fa-chart-pie me-2"></i>Reportes IT</a>
+    </nav>
+
+    <hr class="text-muted mt-auto">
+    <div class="d-flex align-items-center mb-3 px-2">
+        <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 38px; height: 38px;"><i class="fas fa-user-shield text-white"></i></div>
+        <div class="overflow-hidden">
+            <p class="mb-0 small fw-bold text-white text-truncate">{{ session['username'] }}</p>
+            <p class="mb-0 text-muted" style="font-size: 0.65rem;">Administrador</p>
+        </div>
+    </div>
+    <a href="/logout" class="nav-link text-danger small p-2 fw-bold text-decoration-none"><i class="fas fa-sign-out-alt me-2"></i>CERRAR SESIÓN</a>
+</div>
+
+<div class="main-content">
+    <div id="notes-section">
+        <div class="card card-custom p-3 border-start border-primary border-4 shadow-sm mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3"><h5 class="fw-bold mb-0"><i class="fas fa-sticky-note text-warning me-2"></i>Notas Rápidas</h5><form action="/agregar_nota" method="POST" class="d-flex gap-2 w-50"><input type="text" name="contenido" class="form-control form-control-sm border-0 bg-light" placeholder="Anotación..." required><button type="submit" class="btn btn-primary btn-sm rounded-circle"><i class="fas fa-plus"></i></button></form></div>
+            <div class="d-flex flex-wrap gap-2">{% for n in notas %}<div class="badge bg-light text-dark p-2 border d-flex align-items-center gap-2 shadow-sm"><span>{{ n.contenido }}</span><small class="text-muted" style="font-size: 0.65rem;">{{ n.fecha }}</small><a href="/eliminar_nota/{{ n.id }}" class="text-danger ms-1" style="text-decoration:none;">&times;</a></div>{% endfor %}</div>
+        </div>
+    </div>
+
+    <div class="row mb-5" id="dashboard-summary">
+        <div class="col-md-4"><div class="card card-custom p-4 card-stat shadow-sm border-start border-primary border-5"><h6>Equipos</h6><h3 class="fw-bold mb-0">{{ resumen.equipos }}</h3></div></div>
+        <div class="col-md-4"><div class="card card-custom p-4 card-stat shadow-sm border-start border-warning border-5"><h6>Pendientes</h6><h3 id="stat-pendientes-dashboard" class="fw-bold mb-0 text-warning">{{ resumen.pendientes }}</h3></div></div>
+        <div class="col-md-4"><div class="card card-custom p-4 card-stat shadow-sm border-start border-danger border-5"><h6>Vencidos / Hoy</h6><h3 id="stat-vencidos" class="fw-bold mb-0 text-danger">{{ resumen.vencidos }}</h3></div></div>
+    </div>
+
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="tickets">
+            <div class="d-flex justify-content-between align-items-center mb-4"><h3>Incidencias</h3><div class="d-flex gap-2"><div class="position-relative"><i class="fas fa-search position-absolute" style="left:12px; top:12px; color:#94a3b8;"></i><input type="text" class="form-control search-input" id="searchTickets" placeholder="Buscar ticket..." style="width: 250px;"></div><button class="btn btn-primary rounded-pill px-4 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddTicket">Nuevo Reporte</button></div></div>
+            <div class="card card-custom overflow-hidden"><table class="table align-middle m-0" id="tableTickets"><thead class="table-light"><tr><th class="ps-4">Folio</th><th>Usuario</th><th>Equipo</th><th>Falla</th><th>Solución</th><th>Estado</th><th class="text-end pe-4">Acciones</th></tr></thead>
+                <tbody>{% for t in tickets %}<tr><td class="ps-4 fw-bold">#{{ loop.revindex }}</td><td>{{ t.usuario }}</td><td><span class="badge bg-light text-dark border">{{ t.info_web }}</span></td><td><small class="text-muted">{{ t.problema }}</small></td><td><small class="text-primary fw-bold">{{ t.comentarios if t.comentarios else '-' }}</small></td><td><span class="badge {{ 'bg-success' if t.solucion == 'Solucionado' else 'bg-warning text-dark' }}">{{ t.solucion }}</span></td><td class="text-end pe-4"><div class="btn-group"><button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEdit{{t.id}}"><i class="fas fa-cog"></i></button><button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalDel{{t.id}}"><i class="fas fa-trash"></i></button></div></td></tr>{% endfor %}</tbody>
+            </table></div>
+        </div>
+
+        <div class="tab-pane fade" id="inventario">
+            <div class="d-flex justify-content-between align-items-center mb-4"><h3>Inventario</h3><div class="d-flex gap-2"><div class="position-relative"><i class="fas fa-search position-absolute" style="left:12px; top:12px; color:#94a3b8;"></i><input type="text" class="form-control search-input" id="searchInventario" placeholder="Buscar equipo..." style="width: 250px;"></div><button class="btn btn-primary px-4 rounded-pill shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddEquip">Agregar Activo</button></div></div>
+            <div class="card card-custom p-0 overflow-hidden"><table class="table align-middle m-0 table-small-text" id="tableInventario"><thead class="table-light"><tr><th>HOSTNAME / MARCA</th><th>USUARIO / ASIGNACIÓN</th><th>SERIE / MODELO</th><th>ESPECIFICACIONES</th><th>RED / MAC</th><th>UBICACIÓN</th><th class="text-end pe-4">ACCIONES</th></tr></thead>
+                <tbody>{% for e in equipos %}<tr><td class="ps-3"><strong>{{ e.nombre_equipo }}</strong><br><small class="text-primary">{{ e.marca if e.marca and e.marca != 'None' else '-' }}</small></td><td>{{ e.usuario }}<br><small class="text-muted">{{ e.fecha_asignacion if e.fecha_asignacion and e.fecha_asignacion != 'None' else '-' }}</small></td><td><small class="fw-bold">{{ e.n_serie if e.n_serie and e.n_serie != 'None' else '-' }}</small><br><small class="text-muted">{{ e.modelo if e.modelo and e.modelo != 'None' else '-' }}</small></td><td><small class="fw-bold text-dark">{{ e.especificaciones or '-' }}</small></td><td><span class="badge bg-light text-dark border">{{ e.ip_address }}</span><br><code class="mac-style">{{ e.mac_address if e.mac_address and e.mac_address != 'None' else 'N/A' }}</code></td><td><span class="badge bg-info text-white">{{ e.ubicacion if e.ubicacion and e.ubicacion != 'None' else '-' }}</span></td><td class="text-end pe-4"><div class="btn-group"><button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEditEq{{e.id}}"><i class="fas fa-cog"></i></button><button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalDelEq{{e.id}}"><i class="fas fa-trash"></i></button></div></td></tr>{% endfor %}</tbody>
+            </table></div>
+        </div>
+
+        <div class="tab-pane fade" id="boveda">
+            <div class="d-flex justify-content-between align-items-center mb-4"><h3>Bóveda</h3><div class="d-flex gap-2"><div class="position-relative"><i class="fas fa-search position-absolute" style="left:12px; top:12px; color:#94a3b8;"></i><input type="text" class="form-control search-input" id="searchBoveda" placeholder="Buscar servicio..." style="width: 300px;"></div><button class="btn btn-danger rounded-pill px-4 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddClave">Nueva Clave</button></div></div>
+            <div class="row g-3" id="bovedaCards">{% for c in claves %}<div class="col-md-4 card-item"><div class="card card-custom p-3 border-start border-danger border-4 position-relative h-100"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="fw-bold mb-0 text-truncate" style="max-width: 70%;">{{ c.servicio }}</h6><div class="btn-group"><button class="btn btn-sm btn-link text-primary p-1" data-bs-toggle="modal" data-bs-target="#modalEditClave{{c.id}}"><i class="fas fa-edit"></i></button><button class="btn btn-sm btn-link text-muted p-1" data-bs-toggle="modal" data-bs-target="#modalDelClave{{c.id}}"><i class="fas fa-times"></i></button></div></div><small class="text-muted d-block mb-3">{{ c.usuario_acceso }}</small><div class="pass-box d-flex justify-content-between align-items-center shadow-sm"><code class="text-danger fw-bold" id="pass{{ c.id }}" data-real="{{ c.password_acceso }}">********</code><button class="btn btn-sm text-muted p-0" onclick="togglePass('{{ c.id }}')"><i class="fas fa-eye"></i></button></div></div></div>{% endfor %}</div>
+        </div>
+
+        <div class="tab-pane fade" id="prestamos">
+            <div class="d-flex justify-content-between align-items-center mb-4"><h3>Control de Préstamos</h3><button class="btn btn-info text-white rounded-pill px-4 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddPrestamo">Registrar Salida</button></div>
+            <div class="card card-custom p-0 overflow-hidden"><table class="table align-middle m-0" id="tablePrestamos"><thead class="table-light"><tr><th class="ps-3">ARTÍCULO</th><th>USUARIO</th><th>FECHA SALIDA</th><th>RETORNO ESTIMADO</th><th>ESTADO</th><th class="text-end pe-4">ACCIONES</th></tr></thead>
+                <tbody>{% for p in prestamos %}<tr><td class="ps-3"><strong>{{ p.articulo }}</strong></td><td>{{ p.usuario_prestamo }}</td><td>{{ p.fecha_salida }}</td><td>{{ p.fecha_retorno_estimada }}</td><td><span class="badge {{ 'bg-success' if p.estado == 'Devuelto' else 'bg-primary' }}">{{ p.estado }}</span></td><td class="text-end pe-4"><div class="btn-group">{% if p.estado == 'Activo' %}<a href="/finalizar_prestamo/{{p.id}}" class="btn btn-sm btn-outline-success"><i class="fas fa-check-circle"></i></a>{% endif %}<button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalDelPrestamo{{p.id}}"><i class="fas fa-trash"></i></button></div></td></tr>{% endfor %}</tbody>
+            </table></div>
+        </div>
+
+        <div class="tab-pane fade" id="wiki">
+            <div class="d-flex justify-content-between align-items-center mb-4"><h3>Wiki Técnica</h3><div class="d-flex gap-2"><div class="position-relative"><i class="fas fa-search position-absolute" style="left:12px; top:12px; color:#94a3b8;"></i><input type="text" class="form-control search-input" id="searchWiki" placeholder="Buscar guía..." style="width: 300px;"></div><button class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalAddWiki">Nueva Guía</button></div></div>
+            <div class="row g-3">{% for w in wiki %}<div class="col-12 wiki-item"><div class="card card-custom p-3 wiki-card"><div class="d-flex justify-content-between"><div><span class="badge bg-light text-primary border border-primary mb-2">{{ w.categoria }}</span><h5 class="fw-bold mb-1">{{ w.titulo }}</h5><small class="text-muted">Actualizado: {{ w.fecha_actualizacion }}</small></div><div class="btn-group align-self-start"><button class="btn btn-sm btn-outline-primary border-0" data-bs-toggle="modal" data-bs-target="#modalEditWiki{{w.id}}"><i class="fas fa-edit"></i></button><button class="btn btn-sm btn-outline-danger border-0" data-bs-toggle="modal" data-bs-target="#modalDelWiki{{w.id}}"><i class="fas fa-trash"></i></button></div></div><hr class="my-3"><div class="wiki-content">{{ w.contenido }}</div></div></div>{% endfor %}</div>
+        </div>
+
+        <div class="tab-pane fade" id="mantenimiento">
+            <div class="d-flex justify-content-between mb-4"><h3>Mantenimiento</h3><button class="btn btn-success px-4 rounded-pill shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddManto">Registrar</button></div>
+            <div class="card card-custom p-0 overflow-hidden"><table class="table align-middle m-0" id="tableManto"><thead class="table-light"><tr><th class="ps-3">EQUIPO</th><th>FECHA REALIZADO</th><th>DETALLES</th><th>PRÓXIMA FECHA</th><th class="text-end pe-4">ACCIONES</th></tr></thead>
+                <tbody>{% for m in mantenimientos %}<tr><td class="ps-3"><strong>{{ m.nombre_equipo }}</strong></td><td>{{ m.fecha_realizado }}</td><td><small class="text-muted">{{ m.descripcion[:50] }}...</small></td><td><span class="badge {{ 'bg-danger shadow' if m.proxima_fecha < fecha_actual else 'bg-light text-danger border' }}">{{ m.proxima_fecha }} {{ 'VENCIDO' if m.proxima_fecha < fecha_actual else '' }}</span></td><td class="text-end pe-4"><div class="btn-group"><button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEditManto{{m.id}}"><i class="fas fa-cog"></i></button><button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalDelManto{{m.id}}"><i class="fas fa-trash"></i></button></div></td></tr>{% endfor %}</tbody>
+            </table></div>
+        </div>
+
+        <div class="tab-pane fade" id="reportes">
+            <div class="d-flex justify-content-between align-items-center mb-4"><h3>IT Analytics</h3><a href="/descargar_reporte_excel" class="btn btn-success rounded-pill px-4 shadow-sm fw-bold">Excel</a></div>
+            <div class="row g-4">
+                <div class="col-md-6 text-center">
+                    <div class="card card-custom p-4"><h6>ESTADO TICKETS</h6><div style="height:250px;"><canvas id="chartTickets"></canvas></div></div>
+                </div>
+                <div class="col-md-6 text-center">
+                    <div class="card card-custom p-4"><h6>MANTENIMIENTOS</h6><div style="height:250px;"><canvas id="chartManto"></canvas></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalAddTicket" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form action="/crear_incidencia_manual" method="POST" class="modal-content"><div class="modal-header bg-primary text-white"><h5>Nuevo Reporte</h5></div><div class="modal-body p-4"><label class="small fw-bold">USUARIO:</label><input type="text" name="usuario" class="form-control mb-3" required><label class="small fw-bold">EQUIPO:</label><select name="equipo_nombre" class="form-select mb-3">{% for e in equipos %}<option value="{{e.nombre_equipo}}">{{e.nombre_equipo}}</option>{% endfor %}<option value="OTRO">OTRO</option></select><label class="small fw-bold">FALLA:</label><textarea name="problema" class="form-control" required></textarea></div><div class="modal-footer"><button type="submit" class="btn btn-primary w-100 rounded-pill shadow">Crear</button></div></form></div></div>
+<div class="modal fade" id="modalAddWiki" tabindex="-1"><div class="modal-dialog modal-lg"><form action="/agregar_wiki" method="POST" class="modal-content"><div class="modal-header bg-primary text-white"><h5>Nueva Guía Wiki</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body p-4"><label class="small fw-bold">TÍTULO:</label><input type="text" name="titulo" class="form-control mb-3" required><label class="small fw-bold">CATEGORÍA:</label><select name="categoria" class="form-select mb-3"><option value="Software">Software</option><option value="Hardware">Hardware</option><option value="Redes">Redes</option><option value="General">General</option></select><label class="small fw-bold">CONTENIDO:</label><textarea name="contenido" class="form-control" rows="8" required></textarea></div><div class="modal-footer"><button type="submit" class="btn btn-primary w-100 rounded-pill shadow">Publicar</button></div></form></div></div>
+<div class="modal fade" id="modalAddEquip" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered"><form action="/agregar_equipo" method="POST" class="modal-content"><div class="modal-header bg-light"><h5>Registrar Activo IT</h5></div><div class="modal-body p-4"><div class="row g-3">
+    <div class="col-md-6"><label class="small fw-bold">HOSTNAME:</label><input type="text" name="nombre" class="form-control" required></div><div class="col-md-6"><label class="small fw-bold">USUARIO:</label><input type="text" name="usuario" class="form-control" required></div>
+    <div class="col-md-4"><label class="small fw-bold">MARCA:</label><input type="text" name="marca" class="form-control"></div><div class="col-md-4"><label class="small fw-bold">MODELO:</label><input type="text" name="modelo" class="form-control"></div><div class="col-md-4"><label class="small fw-bold">SERIE:</label><input type="text" name="serie" class="form-control"></div>
+    <div class="col-md-6"><label class="small fw-bold">UBICACIÓN:</label><input type="text" name="ubicacion" class="form-control"></div><div class="col-md-6"><label class="small fw-bold">ASIGNACIÓN:</label><input type="date" name="fecha_asig" class="form-control"></div>
+    <div class="col-md-6"><label class="small fw-bold">IP:</label><input type="text" name="ip" class="form-control"></div><div class="col-md-6"><label class="small fw-bold">RED:</label><select name="red" class="form-select"><option value="Ethernet">Cable</option><option value="Wi-Fi">Wi-Fi</option></select></div>
+    <div class="col-12"><label class="small fw-bold">SPECS TOTALES:</label><textarea name="specs" class="form-control" placeholder="RAM | Disco"></textarea></div>
+</div></div><div class="modal-footer"><button type="submit" class="btn btn-primary w-100 rounded-pill shadow">Guardar</button></div></form></div></div>
+<div class="modal fade" id="modalAddClave" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form action="/agregar_clave" method="POST" class="modal-content"><div class="modal-header bg-danger text-white"><h5>Nueva Credencial</h5></div><div class="modal-body p-4"><label class="small fw-bold">SERVICIO:</label><input type="text" name="servicio" class="form-control mb-2" required><label class="small fw-bold">USUARIO:</label><input type="text" name="usuario" class="form-control mb-2" required><label class="small fw-bold">CONTRASEÑA:</label><input type="text" name="password" class="form-control mb-2" required><label class="small fw-bold">LINK:</label><input type="text" name="url" class="form-control"></div><div class="modal-footer"><button type="submit" class="btn btn-danger w-100 rounded-pill shadow">Guardar</button></div></form></div></div>
+<div class="modal fade" id="modalAddManto" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form action="/agregar_mantenimiento" method="POST" class="modal-content"><div class="modal-header bg-success text-white"><h5>Registrar</h5></div><div class="modal-body p-4"><label class="small fw-bold">EQUIPO:</label><select name="equipo_id" class="form-select mb-3">{% for e in equipos %}<option value="{{e.id}}">{{e.nombre_equipo}}</option>{% endfor %}</select><label class="small fw-bold">REALIZADO:</label><input type="date" name="fecha" class="form-control mb-3" required><label class="small fw-bold">PRÓXIMA FECHA:</label><input type="date" name="proxima_fecha" class="form-control mb-3" required><label class="small fw-bold">DETALLES:</label><textarea name="description" class="form-control" required></textarea></div><div class="modal-footer"><button type="submit" class="btn btn-success w-100 rounded-pill shadow">Guardar</button></div></form></div></div>
+<div class="modal fade" id="modalAddPrestamo" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form action="/agregar_prestamo" method="POST" class="modal-content"><div class="modal-header bg-info text-white"><h5>Registrar Préstamo</h5></div><div class="modal-body p-4"><label class="small fw-bold">ARTÍCULO:</label><input type="text" name="articulo" class="form-control mb-3" required><label class="small fw-bold">USUARIO:</label><input type="text" name="usuario" class="form-control mb-3" required><label class="small fw-bold">SALIDA:</label><input type="date" name="salida" class="form-control mb-3" required><label class="small fw-bold">RETORNO:</label><input type="date" name="retorno" class="form-control mb-3" required></div><div class="modal-footer"><button type="submit" class="btn btn-info text-white w-100 rounded-pill shadow">Guardar</button></div></form></div></div>
+
+{% for t in tickets %}<div class="modal fade" id="modalEdit{{t.id}}" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form action="/actualizar_ticket/{{t.id}}" method="POST" class="modal-content"><div class="modal-body p-4"><label class="small fw-bold">ESTADO:</label><select name="estado" class="form-select mb-3"><option value="Pendiente" {{'selected' if t.solucion=='Pendiente'}}>Pendiente</option><option value="Solucionado" {{'selected' if t.solucion=='Solucionado'}}>Solucionado</option></select><label class="small fw-bold">SOLUCIÓN:</label><textarea name="comentario" class="form-control" required>{{t.comentarios}}</textarea></div><div class="modal-footer"><button type="submit" class="btn btn-primary w-100 rounded-pill">Guardar</button></div></form></div></div><div class="modal fade" id="modalDel{{t.id}}" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content p-4 text-center"><h6>¿Borrar?</h6><div class="d-flex gap-2 mt-3"><a href="/eliminar_ticket/{{t.id}}" class="btn btn-danger w-100 text-decoration-none py-2 rounded shadow-sm text-decoration-none">Sí</a></div></div></div></div>{% endfor %}
+{% for e in equipos %}<div class="modal fade" id="modalEditEq{{e.id}}" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered"><form action="/actualizar_equipo/{{e.id}}" method="POST" class="modal-content"><div class="modal-header bg-primary text-white"><h5>Gestionar: {{e.nombre_equipo}}</h5></div><div class="modal-body p-4"><div class="row g-3">
+    <div class="col-md-6"><label class="small fw-bold">HOSTNAME:</label><input type="text" name="nombre" class="form-control" value="{{e.nombre_equipo}}"></div><div class="col-md-6"><label class="small fw-bold">USUARIO:</label><input type="text" name="usuario" class="form-control" value="{{e.usuario}}"></div>
+    <div class="col-md-4"><label class="small fw-bold">MARCA:</label><input type="text" name="marca" class="form-control" value="{{e.marca if e.marca != 'None' else ''}}"></div><div class="col-md-4"><label class="small fw-bold">MODELO:</label><input type="text" name="modelo" class="form-control" value="{{e.modelo if e.modelo != 'None' else ''}}"></div><div class="col-md-4"><label class="small fw-bold">SERIE:</label><input type="text" name="serie" class="form-control" value="{{e.n_serie if e.n_serie != 'None' else ''}}"></div>
+    <div class="col-md-6"><label class="small fw-bold">UBICACIÓN:</label><input type="text" name="ubicacion" class="form-control" value="{{e.ubicacion if e.ubicacion != 'None' else ''}}"></div><div class="col-md-6"><label class="small fw-bold">FECHA ASIGNACIÓN:</label><input type="date" name="fecha_asig" class="form-control" value="{{e.fecha_asignacion}}"></div>
+    <div class="col-md-6"><label class="small fw-bold">IP LOCAL:</label><input type="text" name="ip" class="form-control" value="{{e.ip_address}}"></div><div class="col-md-6"><label class="small fw-bold">RED:</label><select name="red" class="form-select"><option value="Ethernet" {{'selected' if e.tipo_red=='Ethernet'}}>Ethernet</option><option value="Wi-Fi" {{'selected' if e.tipo_red=='Wi-Fi'}}>Wi-Fi</option></select></div>
+    <div class="col-12"><label class="small fw-bold">ESPECIFICACIONES:</label><textarea name="specs" class="form-control">{{e.especificaciones}}</textarea></div>
+</div></div><div class="modal-footer"><button type="submit" class="btn btn-primary w-100 rounded-pill shadow">Actualizar</button></div></form></div></div><div class="modal fade" id="modalDelEq{{e.id}}" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content p-4 text-center"><h6>¿Borrar?</h6><div class="d-flex gap-2 mt-3"><a href="/eliminar_equipo/{{e.id}}" class="btn btn-danger w-100 text-decoration-none py-2 rounded shadow-sm text-decoration-none">Sí</a></div></div></div></div>{% endfor %}
+{% for c in claves %}<div class="modal fade" id="modalEditClave{{c.id}}" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form action="/actualizar_clave/{{c.id}}" method="POST" class="modal-content"><div class="modal-header bg-primary text-white"><h5>Editar</h5></div><div class="modal-body p-4"><label class="small fw-bold">SERVICIO:</label><input type="text" name="servicio" class="form-control mb-3" value="{{c.servicio}}"><label class="small fw-bold">USUARIO:</label><input type="text" name="usuario" class="form-control mb-3" value="{{c.usuario_acceso}}"><label class="small fw-bold">PASS:</label><input type="text" name="password" class="form-control mb-3" value="{{c.password_acceso}}"><label class="small fw-bold">URL:</label><input type="text" name="url" class="form-control" value="{{c.link_url if c.link_url != None else ''}}"></div><div class="modal-footer"><button type="submit" class="btn btn-primary w-100 rounded-pill shadow">Guardar</button></div></form></div></div><div class="modal fade" id="modalDelClave{{c.id}}" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content p-4 text-center"><h6>¿Borrar?</h6><div class="d-flex gap-2 mt-3"><a href="/eliminar_clave/{{c.id}}" class="btn btn-danger w-100 text-decoration-none py-2 rounded shadow-sm text-decoration-none">Sí</a></div></div></div></div>{% endfor %}
+{% for m in mantenimientos %}<div class="modal fade" id="modalEditManto{{m.id}}" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form action="/actualizar_mantenimiento/{{m.id}}" method="POST" class="modal-content"><div class="modal-header bg-primary text-white"><h5>Editar Registro</h5></div><div class="modal-body p-4"><label class="small fw-bold">FECHA:</label><input type="date" name="fecha" class="form-control mb-3" value="{{m.fecha_realizado}}"><label class="small fw-bold">PRÓXIMA:</label><input type="date" name="proxima_fecha" class="form-control mb-3" value="{{m.proxima_fecha}}"><label class="small fw-bold">DETALLES:</label><textarea name="description" class="form-control" required>{{m.descripcion}}</textarea></div><div class="modal-footer"><button type="submit" class="btn btn-primary w-100 rounded-pill shadow">Actualizar</button></div></form></div></div><div class="modal fade" id="modalDelManto{{m.id}}" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content p-4 text-center"><h6>¿Borrar?</h6><div class="d-flex gap-2 mt-3"><a href="/eliminar_mantenimiento/{{m.id}}" class="btn btn-danger w-100 text-decoration-none py-2 rounded shadow-sm text-decoration-none">Sí</a></div></div></div></div>{% endfor %}
+{% for p in prestamos %}<div class="modal fade" id="modalDelPrestamo{{p.id}}" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content p-4 text-center"><h6>¿Borrar?</h6><div class="d-flex gap-2 mt-3"><a href="/eliminar_prestamo/{{p.id}}" class="btn btn-danger w-100 text-decoration-none py-2 rounded shadow-sm text-decoration-none">Sí</a></div></div></div></div>{% endfor %}
+{% for w in wiki %}<div class="modal fade" id="modalEditWiki{{w.id}}" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered"><form action="/editar_wiki/{{w.id}}" method="POST" class="modal-content"><div class="modal-header bg-primary text-white"><h5>Editar Guía</h5></div><div class="modal-body p-4"><div class="row g-3"><div class="col-md-8"><label class="small fw-bold">TÍTULO:</label><input type="text" name="titulo" class="form-control" value="{{w.titulo}}" required></div><div class="col-md-4"><label class="small fw-bold">CATEGORÍA:</label><select name="categoria" class="form-select"><option value="Software" {{'selected' if w.categoria=='Software'}}>Software</option><option value="Redes" {{'selected' if w.categoria=='Redes'}}>Redes</option><option value="Hardware" {{'selected' if w.categoria=='Hardware'}}>Hardware</option><option value="Servidores" {{'selected' if w.categoria=='Servidores'}}>Servidores</option><option value="General" {{'selected' if w.categoria=='General'}}>General</option></select></div><div class="col-12"><label class="small fw-bold">CONTENIDO:</label><textarea name="contenido" class="form-control" rows="10" required>{{w.contenido}}</textarea></div></div></div><div class="modal-footer"><button type="submit" class="btn btn-primary w-100 rounded-pill shadow">Actualizar</button></div></form></div></div><div class="modal fade" id="modalDelWiki{{w.id}}" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content p-4 text-center"><h6>¿Borrar?</h6><div class="d-flex gap-2 mt-3"><a href="/eliminar_wiki/{{w.id}}" class="btn btn-danger w-100 py-2 rounded shadow-sm text-decoration-none">Sí</a></div></div></div></div>{% endfor %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script id="flask-data" type="application/json">{"stats_tickets": {{ stats_tickets | tojson }}, "stats_manto": {{ stats_manto | tojson }}}</script>
+
+<script>
+    let currentPendientes = parseInt('{{ resumen.pendientes }}');
+    const audio = document.getElementById('notifSound');
+
+    function togglePass(id) { const p = document.getElementById('pass' + id); p.innerText = (p.innerText === '********') ? p.getAttribute('data-real') : '********'; }
+    
+    // FUNCIÓN DE BÚSQUEDA UNIVERSAL (Restaurada y Ampliada)
+    function setupSearch(inputId, targetSelector, isTable) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        input.addEventListener('keyup', function() {
+            const term = input.value.toLowerCase();
+            document.querySelectorAll(targetSelector).forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(term) ? (isTable ? '' : 'block') : 'none';
+            });
+        });
+    }
+
+    function liveUpdate() {
+        if (document.querySelector('.modal.show')) return;
+
+        fetch('/').then(r => r.text()).then(html => {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            
+            const statDash = doc.querySelector('#stat-pendientes-dashboard');
+            if (statDash) {
+                const newPendientes = parseInt(statDash.innerText);
+                if (newPendientes > currentPendientes) { 
+                    audio.play().catch(() => {}); 
+                    currentPendientes = newPendientes;
+                }
+            }
+
+            const ids = ['#tableTickets tbody', '#tableInventario tbody', '#tableManto tbody', '#tablePrestamos tbody', '#dashboard-summary', '#notes-section', '#sidebar-pend-badge', '#wiki', '#bovedaCards'];
+            
+            ids.forEach(id => {
+                const target = document.querySelector(id);
+                const source = doc.querySelector(id);
+                if(target && source && target.innerHTML.trim() !== source.innerHTML.trim()) {
+                    target.innerHTML = source.innerHTML;
+                    if (id === '#sidebar-pend-badge') target.classList.toggle('d-none', target.innerText === '0');
+                    
+                    const modalTriggers = [].slice.call(document.querySelectorAll('[data-bs-toggle="modal"]'));
+                    modalTriggers.map(function (trigger) {
+                        return new bootstrap.Modal(document.getElementById(trigger.getAttribute('data-bs-target').replace('#','')), {});
+                    });
+                }
+            });
+        }).catch(err => console.error("Error refresh:", err));
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // ACTIVAR BUSCADORES
+        setupSearch('searchTickets', '#tableTickets tbody tr', true);
+        setupSearch('searchInventario', '#tableInventario tbody tr', true);
+        setupSearch('searchBoveda', '.card-item', false);
+        setupSearch('searchWiki', '.wiki-item', false);
+
+        const hash = window.location.hash;
+        if (hash) {
+            const tr = document.querySelector(`.nav-link[href="${hash}"]`);
+            if (tr) bootstrap.Tab.getOrCreateInstance(tr).show();
+        }
+        setInterval(liveUpdate, 8000);
+
+        try {
+            const data = JSON.parse(document.getElementById('flask-data').textContent);
+            const ctxT = document.getElementById('chartTickets');
+            if (ctxT) {
+                new Chart(ctxT, { type: 'doughnut', data: { labels: ['Solucionados', 'Pendientes'], datasets: [{ data: data.stats_tickets, backgroundColor: ['#10b981', '#f59e0b'] }] }, options: { maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom' } } } });
+            }
+            const ctxM = document.getElementById('chartManto');
+            if (ctxM) {
+                new Chart(ctxM, { type: 'bar', data: { labels: ['Mantenimientos'], datasets: [{ label: 'Realizados', data: data.stats_manto, backgroundColor: '#2563eb' }] }, options: { maintainAspectRatio: false, plugins: { legend: { display: false } } } });
+            }
+        } catch (e) {}
+    });
+</script>
+</body>
+</html>
