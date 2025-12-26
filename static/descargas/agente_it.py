@@ -2,7 +2,7 @@ import requests, psutil, socket, os, subprocess, sys, ctypes, winreg
 from datetime import datetime
 
 SERVER_IP = "192.168.128.107" 
-URL_DESTINO = f"http://{SERVER_IP}:5000/reporte_agente"
+URL_DESTINO = f"https://AlfredoV.pythonanywhere.com/reporte_agente"
 
 def is_admin():
     try: return ctypes.windll.shell32.IsUserAnAdmin()
