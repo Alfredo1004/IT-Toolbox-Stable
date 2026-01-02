@@ -10,6 +10,8 @@ app.secret_key = 'it_toolbox_secure_key_2025'
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'descargas')
 
+SOFTWARE_PROHIBIDO = ["Torrent", "Steam", "Spotify", "Netflix", "AnyDesk", "TeamViewer"]
+
 def conectar_db():
     # Esto asegura que busque la DB en la misma carpeta donde está app.py
     db_path = os.path.join(BASE_DIR, 'soporte.db') 
@@ -29,6 +31,7 @@ def login_required(f):
 def reporte_agente():
     data = request.get_json()
     if not data: return jsonify({"status": "error"}), 400
+    
     hostname = data.get('equipo'); usuario = data.get('usuario')
     ip = data.get('ip_v4', '0.0.0.0'); mac = data.get('mac', 'N/A')
     specs = f"RAM: {data.get('ram_total')} | Disco: {data.get('disco_total')}"
@@ -36,28 +39,51 @@ def reporte_agente():
     software_recibido = data.get('software', [])
 
     conn = conectar_db(); cursor = conn.cursor()
+    
+    # 1. BÚSQUEDA ROBUSTA DEL EQUIPO (Evita que el inventario quede vacío)
+    existe = None
     if mac and mac != "N/A":
         cursor.execute("SELECT id FROM inventario WHERE mac_address = ?", (mac,))
-    else:
-        cursor.execute("SELECT id FROM inventario WHERE nombre_equipo = ?", (hostname,))
+        existe = cursor.fetchone()
     
-    existe = cursor.fetchone()
+    if not existe:
+        cursor.execute("SELECT id FROM inventario WHERE nombre_equipo = ?", (hostname,))
+        existe = cursor.fetchone()
+    
+    # 2. ACTUALIZAR O INSERTAR (Con todos los campos necesarios)
     if existe:
         cursor.execute("""UPDATE inventario SET ip_address=?, especificaciones=?, usuario=?, n_serie=?, marca=?, modelo=?, mac_address=? WHERE id=?""", 
                        (ip, specs, usuario, serie, marca, modelo, mac, existe['id']))
     else:
-        cursor.execute("""INSERT INTO inventario (nombre_equipo, usuario, especificaciones, ip_address, n_serie, marca, modelo, mac_address, tipo_red, ubicacion) VALUES (?,?,?,?,?,?,?,?,?,?)""", 
-                       (hostname, usuario, specs, ip, serie, marca, modelo, mac, 'Ethernet', 'Monterrey'))
+        cursor.execute("""INSERT INTO inventario (nombre_equipo, usuario, especificaciones, ip_address, n_serie, marca, modelo, mac_address, tipo_red, ubicacion, fecha_asignacion) 
+                          VALUES (?,?,?,?,?,?,?,?,?,?,?)""", 
+                       (hostname, usuario, specs, ip, serie, marca, modelo, mac, 'Ethernet', 'Monterrey', datetime.now().strftime('%Y-%m-%d')))
     
-    # ACTUALIZACIÓN DE SOFTWARE
+    # 3. ACTUALIZACIÓN DE SOFTWARE Y DETECCIÓN DE PROHIBIDOS
     cursor.execute("DELETE FROM software_inventario WHERE nombre_equipo = ?", (hostname,))
-    for s in software_recibido:
-        cursor.execute("INSERT INTO software_inventario (nombre_equipo, nombre_software, version, fecha_escaneo) VALUES (?,?,?,?)",
-                       (hostname, s['nombre'], s['version'], datetime.now().strftime('%Y-%m-%d')))
+    prohibidos_hallados = []
 
-    info_json = json.dumps({"equipo": hostname, "ram": data.get('ram_uso'), "disco": data.get('disco_libre')})
+    for s in software_recibido:
+        n_sw = s['nombre']; v_sw = s['version']
+        cursor.execute("INSERT INTO software_inventario (nombre_equipo, nombre_software, version, fecha_escaneo) VALUES (?,?,?,?)",
+                       (hostname, n_sw, v_sw, datetime.now().strftime('%Y-%m-%d')))
+        
+        if any(p.lower() in n_sw.lower() for p in SOFTWARE_PROHIBIDO):
+            prohibidos_hallados.append(n_sw)
+
+    # 4. CONSOLIDACIÓN DE INCIDENCIA (Evita alternancia de estado Pendiente/Prohibido)
+    info_recursos = f"🧠{data.get('ram_uso')} | 💾{data.get('disco_libre')}"
+    
+    if prohibidos_hallados:
+        estado_ticket = "Prohibido"  # Se guarda directo en DB para que el refresco lo traiga rojo
+        problema_final = f"⚠️ PROHIBIDO: {', '.join(prohibidos_hallados)} | {info_recursos}"
+    else:
+        estado_ticket = "Pendiente"
+        problema_final = f"Auditoría OK | {info_recursos}"
+
     cursor.execute("INSERT INTO incidencias (equipo, usuario, problema, solucion, fecha) VALUES (?,?,?,?,?)", 
-                   (info_json, usuario, "Auditoría de Hardware y Software", "Pendiente", datetime.now().strftime('%Y-%m-%d %H:%M')))
+                   (hostname, usuario, problema_final, estado_ticket, datetime.now().strftime('%Y-%m-%d %H:%M')))
+    
     conn.commit(); conn.close()
     return jsonify({"status": "success"}), 200
 

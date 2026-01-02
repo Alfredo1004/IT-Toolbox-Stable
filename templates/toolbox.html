@@ -96,7 +96,19 @@
         <div class="tab-pane fade show active" id="tickets">
             <div class="d-flex justify-content-between align-items-center mb-4"><h3>Incidencias</h3><div class="d-flex gap-2"><div class="position-relative"><i class="fas fa-search position-absolute" style="left:12px; top:12px; color:#94a3b8;"></i><input type="text" class="form-control search-input" id="searchTickets" placeholder="Buscar ticket..."></div><button class="btn btn-primary rounded-pill px-4 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddTicket">Nuevo Reporte</button></div></div>
             <div class="card card-custom overflow-hidden"><table class="table align-middle m-0" id="tableTickets"><thead class="table-light"><tr><th>Folio</th><th>Usuario</th><th>Equipo</th><th>Falla</th><th>Solución</th><th>Estado</th><th class="text-end">Acciones</th></tr></thead>
-                <tbody>{% for t in tickets %}<tr><td class="fw-bold ps-3">#{{ loop.revindex }}</td><td>{{ t.usuario }}</td><td><span class="badge bg-light text-dark border">{{ t.info_web }}</span></td><td><small class="text-muted">{{ t.problema }}</small></td><td><small class="text-primary fw-bold">{{ t.comentarios or '-' }}</small></td><td><span class="badge {{ 'bg-success' if t.solucion == 'Solucionado' else 'bg-warning text-dark' }}">{{ t.solucion }}</span></td><td class="text-end pe-3"><div class="btn-group"><button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEdit{{t.id}}"><i class="fas fa-cog"></i></button><button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalDel{{t.id}}"><i class="fas fa-trash"></i></button></div></td></tr>{% endfor %}</tbody>
+                <tbody>{% for t in tickets %}<tr><td class="fw-bold ps-3">#{{ loop.revindex }}</td><td>{{ t.usuario }}</td><td><span class="badge bg-light text-dark border">{{ t.info_web }}</span></td><td><small class="text-muted">{{ t.problema }}</small></td><td><small class="text-primary fw-bold">{{ t.comentarios or '-' }}</small></td><td>
+    <span class="badge 
+        {% if t.solucion == 'Solucionado' %} bg-success 
+        {% elif t.solucion == 'Prohibido' %} bg-danger shadow-sm 
+        {% else %} bg-warning text-dark {% endif %}">
+        
+        {% if t.solucion == 'Prohibido' %}
+            <i class="fas fa-exclamation-triangle me-1"></i> Prohibido
+        {% else %}
+            {{ t.solucion }}
+        {% endif %}
+    </span>
+    </td><td class="text-end pe-3"><div class="btn-group"><button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEdit{{t.id}}"><i class="fas fa-cog"></i></button><button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalDel{{t.id}}"><i class="fas fa-trash"></i></button></div></td></tr>{% endfor %}</tbody>
             </table></div>
         </div>
 
@@ -170,8 +182,13 @@
     let currentPendientes = parseInt('{{ resumen.pendientes }}');
     const audio = document.getElementById('notifSound');
 
-    function togglePass(id) { const p = document.getElementById('pass' + id); p.innerText = (p.innerText === '********') ? p.getAttribute('data-real') : '********'; }
+    // Función para ver/ocultar contraseñas
+    function togglePass(id) { 
+        const p = document.getElementById('pass' + id); 
+        p.innerText = (p.innerText === '********') ? p.getAttribute('data-real') : '********'; 
+    }
     
+    // Configuración de buscadores
     function setupSearch(inputId, targetSelector, isTable) {
         const input = document.getElementById(inputId);
         if (!input) return;
@@ -184,6 +201,7 @@
         });
     }
 
+    // Carga de software instalado por equipo
     function cargarSoftware(hostname) {
         const modalEl = document.getElementById('modalSoftware');
         const modal = new bootstrap.Modal(modalEl);
@@ -193,16 +211,32 @@
         modal.show();
         fetch('/ver_software/' + hostname).then(r => r.json()).then(data => {
             document.getElementById('softTitle').innerText = "Software: " + hostname;
-            if(data.length === 0) { body.innerHTML = '<tr><td colspan="2" class="text-center p-4">Sin registros.</td></tr>'; return; }
+            if(data.length === 0) { 
+                body.innerHTML = '<tr><td colspan="2" class="text-center p-4">Sin registros.</td></tr>'; 
+                return; 
+            }
             let html = "";
-            data.forEach(s => { html += `<tr><td class="ps-3 fw-bold" style="font-size:0.85rem">${s.nombre_software}</td><td class="text-muted" style="font-size:0.8rem">${s.version}</td></tr>`; });
+            data.forEach(s => { 
+                html += `<tr><td class="ps-3 fw-bold" style="font-size:0.85rem">${s.nombre_software}</td><td class="text-muted" style="font-size:0.8rem">${s.version}</td></tr>`; 
+            });
             setTimeout(() => { body.innerHTML = html; }, 200);
+        });
+    }
+
+    // --- FUNCIÓN DE RESALTADO VISUAL (QUIRÚRGICA) ---
+    function resaltarAlertasSoftware() {
+        document.querySelectorAll('#tableTickets tbody tr').forEach(row => {
+            // Si la celda de falla contiene "PROHIBIDO"
+            if (row.textContent.includes('PROHIBIDO')) {
+                row.style.borderLeft = "5px solid #dc3545"; // Borde rojo
+                row.style.backgroundColor = "rgba(220, 53, 69, 0.05)"; // Fondo sutil
+            }
         });
     }
 
     // ACTUALIZACIÓN CON PROTECCIÓN DE CURSOR
     function liveUpdate() {
-        // Si el usuario tiene el foco en un input o textarea, pausar actualización
+        // Si el usuario tiene el foco en un input o hay un modal abierto, pausar
         if (document.querySelector('.modal.show') || 
             document.activeElement.tagName === 'INPUT' || 
             document.activeElement.tagName === 'TEXTAREA') return;
@@ -210,17 +244,19 @@
         fetch('/').then(r => r.text()).then(html => {
             const doc = new DOMParser().parseFromString(html, 'text/html');
             const ids = ['#tableTickets tbody', '#tableInventario tbody', '#tableManto tbody', '#tablePrestamos tbody', '#dashboard-summary', '#sidebar-pend-badge', '#bovedaCards', '#wiki'];
+            
             ids.forEach(id => {
                 const target = document.querySelector(id);
                 const source = doc.querySelector(id);
                 if(target && source && target.innerHTML.trim() !== source.innerHTML.trim()) {
                     target.innerHTML = source.innerHTML;
                     if (id === '#sidebar-pend-badge') target.classList.toggle('d-none', target.innerText === '0');
-                    const triggers = [].slice.call(document.querySelectorAll('[data-bs-toggle="modal"]'));
-                    triggers.map(function (t) { return new bootstrap.Modal(document.getElementById(t.getAttribute('data-bs-target').replace('#','')), {}); });
                 }
             });
-        });
+
+            // Re-aplicar el resaltado rojo después de actualizar el contenido
+            resaltarAlertasSoftware();
+        }).catch(err => console.error("Error en auto-refresco:", err));
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -231,23 +267,34 @@
             if (triggerEl) bootstrap.Tab.getOrCreateInstance(triggerEl).show();
         }
         document.querySelectorAll('.nav-link[data-bs-toggle="pill"]').forEach(tab => {
-            tab.addEventListener('shown.bs.tab', (e) => { window.location.hash = e.target.getAttribute('href'); });
+            tab.addEventListener('shown.bs.tab', (e) => { 
+                window.location.hash = e.target.getAttribute('href'); 
+            });
         });
 
+        // Inicializar buscadores
         setupSearch('searchTickets', '#tableTickets tbody tr', true);
         setupSearch('searchInventario', '#tableInventario tbody tr', true);
         setupSearch('searchBoveda', '.card-item', false);
         setupSearch('searchWiki', '.wiki-item', false);
         
+        // Ejecutar resaltado inicial
+        resaltarAlertasSoftware();
+
+        // Activar temporizador de refresco (cada 15 segundos)
         setInterval(liveUpdate, 15000);
 
+        // Gráficas Chart.js
         try {
             const data = JSON.parse(document.getElementById('flask-data').textContent);
             const ctxT = document.getElementById('chartTickets');
             if (ctxT) new Chart(ctxT, { type: 'doughnut', data: { labels: ['Solucionados', 'Pendientes'], datasets: [{ data: data.stats_tickets, backgroundColor: ['#10b981', '#f59e0b'] }] }, options: { maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom' } } } });
+            
             const ctxM = document.getElementById('chartManto');
             if (ctxM) new Chart(ctxM, { type: 'bar', data: { labels: ['Realizados'], datasets: [{ label: 'Cant.', data: data.stats_manto, backgroundColor: '#2563eb' }] }, options: { maintainAspectRatio: false, plugins: { legend: { display: false } } } });
-        } catch (e) {}
+        } catch (e) {
+            console.error("Error inicializando gráficas:", e);
+        }
     });
 </script>
 </body>
