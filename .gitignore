@@ -1,3 +1,6 @@
+# Base de datos (Local)
+soporte.db
+
 # Carpetas de compilación de Python y PyInstaller
 build/
 dist/
