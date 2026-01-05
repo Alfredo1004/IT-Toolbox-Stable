@@ -102,7 +102,8 @@ def dashboard():
     conn = conectar_db(); cursor = conn.cursor(); hoy = datetime.now().strftime('%Y-%m-%d')
     cursor.execute("SELECT COUNT(*) FROM inventario"); total_eq = cursor.fetchone()[0]
     cursor.execute("SELECT COUNT(*) FROM incidencias WHERE solucion = 'Pendiente'"); pend = cursor.fetchone()[0]
-    cursor.execute("""SELECT COUNT(*) FROM mantenimiento WHERE proxima_fecha < ? AND proxima_fecha != '' AND proxima_fecha IS NOT NULL""", (hoy,)); venc = cursor.fetchone()[0]
+    cursor.execute("""SELECT COUNT(*) FROM mantenimiento m JOIN inventario e ON m.equipo_id = e.id WHERE m.proxima_fecha < ? AND m.proxima_fecha != '' AND m.proxima_fecha IS NOT NULL""", (hoy,))
+    venc = cursor.fetchone()[0]
 
     cursor.execute("SELECT * FROM incidencias ORDER BY id DESC")
     t_procesados = []
