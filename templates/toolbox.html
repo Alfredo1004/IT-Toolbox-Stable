@@ -31,6 +31,10 @@
         .wiki-card { border-left: 5px solid #2563eb; transition: 0.2s; }
         .wiki-content { white-space: pre-wrap; font-size: 0.9rem; color: #334155; }
     </style>
+    <style>
+    .borde-prohibido { border-left: 5px solid #dc3545 !important; }
+    .borde-normal { border-left: 5px solid transparent !important; }
+</style>
 </head>
 <body>
 
@@ -96,19 +100,57 @@
         <div class="tab-pane fade show active" id="tickets">
             <div class="d-flex justify-content-between align-items-center mb-4"><h3>Incidencias</h3><div class="d-flex gap-2"><div class="position-relative"><i class="fas fa-search position-absolute" style="left:12px; top:12px; color:#94a3b8;"></i><input type="text" class="form-control search-input" id="searchTickets" placeholder="Buscar ticket..."></div><button class="btn btn-primary rounded-pill px-4 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddTicket">Nuevo Reporte</button></div></div>
             <div class="card card-custom overflow-hidden"><table class="table align-middle m-0" id="tableTickets"><thead class="table-light"><tr><th>Folio</th><th>Usuario</th><th>Equipo</th><th>Falla</th><th>Solución</th><th>Estado</th><th class="text-end">Acciones</th></tr></thead>
-                <tbody>{% for t in tickets %}<tr><td class="fw-bold ps-3">#{{ loop.revindex }}</td><td>{{ t.usuario }}</td><td><span class="badge bg-light text-dark border">{{ t.info_web }}</span></td><td><small class="text-muted">{{ t.problema }}</small></td><td><small class="text-primary fw-bold">{{ t.comentarios or '-' }}</small></td><td>
-    <span class="badge 
-        {% if t.solucion == 'Solucionado' %} bg-success 
-        {% elif t.solucion == 'Prohibido' %} bg-danger shadow-sm 
-        {% else %} bg-warning text-dark {% endif %}">
+                <tbody>
+    {% for t in tickets %}
+    <tr class="{% if t.solucion == 'Prohibido' %}borde-prohibido{% else %}borde-normal{% endif %}">
         
-        {% if t.solucion == 'Prohibido' %}
-            <i class="fas fa-exclamation-triangle me-1"></i> Prohibido
-        {% else %}
-            {{ t.solucion }}
-        {% endif %}
-    </span>
-    </td><td class="text-end pe-3"><div class="btn-group"><button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEdit{{t.id}}"><i class="fas fa-cog"></i></button><button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalDel{{t.id}}"><i class="fas fa-trash"></i></button></div></td></tr>{% endfor %}</tbody>
+        <td class="fw-bold ps-3">#{{ loop.revindex }}</td>
+        
+        <td>{{ t.usuario }}</td>
+        
+        <td>
+            <span class="badge bg-light text-dark border">
+                💻 {{ t.equipo }}
+            </span>
+        </td>
+        
+        <td>
+            {% if '🚨 HW:' in t.problema %}
+                <span class="text-danger fw-bold" style="font-size: 0.85rem;">{{ t.problema }}</span>
+            {% else %}
+                <small class="text-muted">{{ t.problema }}</small>
+            {% endif %}
+        </td>
+        
+        <td><small class="text-primary fw-bold">{{ t.comentarios or '-' }}</small></td>
+        
+        <td>
+            <span class="badge 
+                {% if t.solucion == 'Solucionado' %} bg-success 
+                {% elif t.solucion == 'Prohibido' %} bg-danger shadow-sm 
+                {% else %} bg-warning text-dark {% endif %}">
+                
+                {% if t.solucion == 'Prohibido' %}
+                    <i class="fas fa-exclamation-triangle me-1"></i> Prohibido
+                {% else %}
+                    {{ t.solucion }}
+                {% endif %}
+            </span>
+        </td>
+        
+        <td class="text-end pe-3">
+            <div class="btn-group">
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEdit{{t.id}}">
+                    <i class="fas fa-cog"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalDel{{t.id}}">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </td>
+    </tr>
+    {% endfor %}
+</tbody>
             </table></div>
         </div>
 

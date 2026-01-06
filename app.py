@@ -40,7 +40,7 @@ def reporte_agente():
 
     conn = conectar_db(); cursor = conn.cursor()
     
-    # 1. BÚSQUEDA ROBUSTA DEL EQUIPO (Evita que el inventario quede vacío)
+    # 1. BÚSQUEDA ROBUSTA DEL EQUIPO
     existe = None
     if mac and mac != "N/A":
         cursor.execute("SELECT id FROM inventario WHERE mac_address = ?", (mac,))
@@ -50,7 +50,7 @@ def reporte_agente():
         cursor.execute("SELECT id FROM inventario WHERE nombre_equipo = ?", (hostname,))
         existe = cursor.fetchone()
     
-    # 2. ACTUALIZAR O INSERTAR (Con todos los campos necesarios)
+    # 2. ACTUALIZAR O INSERTAR
     if existe:
         cursor.execute("""UPDATE inventario SET ip_address=?, especificaciones=?, usuario=?, n_serie=?, marca=?, modelo=?, mac_address=? WHERE id=?""", 
                        (ip, specs, usuario, serie, marca, modelo, mac, existe['id']))
@@ -71,18 +71,59 @@ def reporte_agente():
         if any(p.lower() in n_sw.lower() for p in SOFTWARE_PROHIBIDO):
             prohibidos_hallados.append(n_sw)
 
-    # 4. CONSOLIDACIÓN DE INCIDENCIA (Evita alternancia de estado Pendiente/Prohibido)
+    # --- 4. NUEVA LÓGICA DE TELEMETRÍA (HARDWARE CRÍTICO) ---
+    alertas_hw = []
     info_recursos = f"🧠{data.get('ram_uso')} | 💾{data.get('disco_libre')}"
     
-    if prohibidos_hallados:
-        estado_ticket = "Prohibido"  # Se guarda directo en DB para que el refresco lo traiga rojo
-        problema_final = f"⚠️ PROHIBIDO: {', '.join(prohibidos_hallados)} | {info_recursos}"
-    else:
-        estado_ticket = "Pendiente"
-        problema_final = f"Auditoría OK | {info_recursos}"
+    try:
+        # 1. Procesar RAM: Usamos float() porque viene con decimales '81.3'
+        ram_str = data.get('ram_uso', '0').replace('%', '').strip()
+        uso_ram_num = float(ram_str)  # Ahora acepta '81.3'
+        
+        # 2. Procesar Disco: Limpieza más profunda
+        disco_libre_str = data.get('disco_libre', '100GB').upper()
+        # Quitamos 'GB' y 'LIBRES' para dejar solo el número
+        disco_limpio = disco_libre_str.replace('GB', '').replace('LIBRES', '').strip()
+        disco_num = float(disco_limpio)
 
+        # Evaluación de límites (Usando tu prueba de < 500)
+        if uso_ram_num > 90:
+            alertas_hw.append(f"RAM SATURADA ({uso_ram_num}%)")
+        if disco_num < 20:
+            alertas_hw.append(f"DISCO CRÍTICO ({disco_num}GB Libres)")
+            
+    except Exception as e:
+        print(f"Error procesando hardware de {hostname}: {e}")
+
+    # --- 5. CONSOLIDACIÓN DE INCIDENCIA MEJORADA ---
+    falla_texto = ""
+    estado_ticket = "Pendiente"
+
+    # 1. Verificamos Software Prohibido
+    if prohibidos_hallados:
+        falla_texto = f"⚠️ PROHIBIDO: {', '.join(prohibidos_hallados)}"
+        estado_ticket = "Prohibido"
+
+    # 2. Verificamos Alertas de Hardware (AQUÍ ESTÁ EL TRUCO)
+    if alertas_hw:
+        # Si ya había texto de software, añadimos un separador, si no, empezamos el texto
+        prefijo = " | " if falla_texto else ""
+        falla_texto += f"{prefijo}🚨 HW: {', '.join(alertas_hw)}"
+        # Si no hay software prohibido pero sí falla de hardware, lo marcamos como Pendiente
+        if not prohibidos_hallados:
+            estado_ticket = "Pendiente"
+
+    # 3. Resultado Final
+    if not falla_texto:
+        problema_final = f"Auditoría OK | {info_recursos}"
+    else:
+        # Aquí unimos las alertas encontradas con la info de recursos al final
+        problema_final = f"{falla_texto} | {info_recursos}"
+
+    # Importante: Asegúrate de que el orden de las columnas coincida con tu tabla SQL
+    print(f"DEBUG: Guardando incidencia -> {problema_final}") # AÑADE ESTA LÍNEA
     cursor.execute("INSERT INTO incidencias (equipo, usuario, problema, solucion, fecha) VALUES (?,?,?,?,?)", 
-                   (hostname, usuario, problema_final, estado_ticket, datetime.now().strftime('%Y-%m-%d %H:%M')))
+                    (hostname, usuario, problema_final, estado_ticket, datetime.now().strftime('%Y-%m-%d %H:%M')))
     
     conn.commit(); conn.close()
     return jsonify({"status": "success"}), 200
