@@ -164,6 +164,8 @@ def dashboard():
     cursor.execute("SELECT * FROM wiki ORDER BY categoria ASC, titulo ASC"); wiki = cursor.fetchall()
     cursor.execute("SELECT * FROM celulares ORDER BY id DESC"); celulares = cursor.fetchall()
 
+    gastos_ordenados = {}
+
     # --- DENTRO DE @app.route('/') ---
 # Consulta de gastos calculando el total por fila
     cursor.execute("SELECT *, (cantidad * precio_unitario) as precio_total FROM gastos ORDER BY fecha DESC")
