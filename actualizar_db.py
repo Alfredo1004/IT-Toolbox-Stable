@@ -1,28 +1,30 @@
 import sqlite3
 
 def actualizar_base():
-    # USANDO TU NOMBRE DE ARCHIVO LOCAL: soporte.db
+    # Conexión a tu base local
     conn = sqlite3.connect('soporte.db')
     cursor = conn.cursor()
 
-    print(f"Conectado a {conn}... Iniciando actualización.")
+    print("Actualizando base de datos para el módulo de gastos...")
 
-    # Crear la tabla de celulares con las columnas que pediste
+    # Creamos la tabla de gastos con los campos de tu Excel
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS celulares (
+        CREATE TABLE IF NOT EXISTS gastos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            usuario TEXT NOT NULL,
-            marca_modelo TEXT NOT NULL,
-            imei TEXT UNIQUE,
-            numero_tel TEXT,
-            fecha_asignacion DATE,
+            fecha DATE NOT NULL,
+            proveedor TEXT,
+            categoria TEXT,
+            descripcion TEXT NOT NULL,
+            sku TEXT,
+            cantidad INTEGER DEFAULT 1,
+            precio_unitario REAL DEFAULT 0,
             comentarios TEXT
         )
     ''')
 
     conn.commit()
     conn.close()
-    print("✅ Tabla 'celulares' creada con éxito en soporte.db")
+    print("✅ Tabla 'gastos' creada exitosamente.")
 
 if __name__ == "__main__":
     actualizar_base()

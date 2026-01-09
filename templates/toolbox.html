@@ -53,6 +53,7 @@
         </a>
         <a class="nav-link" data-bs-toggle="pill" href="#inventario"><i class="fas fa-laptop me-2"></i>Inventario</a>
         <a class="nav-link" data-bs-toggle="pill" href="#celulares"><i class="fas fa-mobile-alt me-2"></i>Celulares</a>
+        <a class="nav-link" data-bs-toggle="pill" href="#gastos"><i class="fas fa-file-invoice-dollar me-2"></i>Gastos IT</a>
         <a class="nav-link" data-bs-toggle="pill" href="#boveda"><i class="fas fa-key me-2"></i>Bóveda Claves</a>
         <a class="nav-link" data-bs-toggle="pill" href="#prestamos"><i class="fas fa-hand-holding-heart me-2"></i>Préstamos</a>
         <a class="nav-link" data-bs-toggle="pill" href="#wiki"><i class="fas fa-book-open me-2"></i>Wiki Técnica</a>
@@ -212,6 +213,144 @@
     </div>
 </div>
 
+<div class="tab-pane fade" id="gastos">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold">Control de Gastos Mensuales</h3>
+        </div>
+        
+        <div class="d-flex gap-3">
+            <div class="input-group" style="width: 300px;">
+                <span class="input-group-text bg-white border-end-0 rounded-pill-start shadow-sm">
+                    <i class="fas fa-search text-muted"></i>
+                </span>
+                <input type="text" id="searchGastos" class="form-control border-start-0 rounded-pill-end shadow-sm" placeholder="Buscar proveedor...">
+            </div>
+            
+            <button class="btn btn-warning px-4 rounded-pill shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddGasto">
+                <i class="fas fa-plus me-1"></i> Nuevo Gasto
+            </button>
+        </div>
+    </div>
+
+    {% for mes, datos in gastos_por_mes.items() %}
+    <div class="mb-5">
+        <h5 class="bg-dark text-white p-2 px-4 rounded-top mb-0 d-inline-block">{{ mes }}</h5>
+        <div class="card card-custom p-0 overflow-hidden shadow-sm border-top-0">
+            <table class="table align-middle m-0 table-sm">
+                <thead class="table-light small fw-bold">
+                    <tr>
+                        <th class="ps-3">FECHA</th>
+                        <th>PROVEEDOR</th>
+                        <th>CATEGORÍA</th>
+                        <th>DESCRIPCIÓN / SKU</th>
+                        <th>CANT.</th>
+                        <th>UNITARIO</th>
+                        <th>TOTAL</th>
+                        <th class="text-end pe-3">ACCIONES</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for g in datos.lista %}
+                    <tr>
+                        <td class="ps-3">{{ g.fecha }}</td>
+                        <td><strong>{{ g.proveedor }}</strong></td>
+                        <td><span class="badge bg-light text-dark border">{{ g.categoria }}</span></td>
+                        <td>{{ g.descripcion }}<br><small class="text-muted">{{ g.sku or '' }}</small></td>
+                        <td>{{ g.cantidad }}</td>
+                        <td>${{ "{:,.2f}".format(g.precio_unitario) }}</td>
+                        <td class="fw-bold text-primary">${{ "{:,.2f}".format(g.precio_total) }}</td>
+                        <td class="text-end pe-3">
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-primary border-0" data-bs-toggle="modal" data-bs-target="#modalEditGasto{{g.id}}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger border-0" data-bs-toggle="modal" data-bs-target="#modalDelGasto{{g.id}}">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="table-info fw-bold">
+                        <td colspan="6" class="text-end">TOTAL ACUMULADO {{ mes }}:</td>
+                        <td colspan="2" class="text-primary">${{ "{:,.2f}".format(datos.total_mes) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% for g in datos.lista %}
+        <div class="modal fade" id="modalDelGasto{{g.id}}" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content border-0 shadow">
+                    <div class="modal-body p-4 text-center">
+                        <i class="fas fa-exclamation-circle text-danger mb-3" style="font-size: 2rem;"></i>
+                        <h6 class="fw-bold">¿Eliminar gasto?</h6>
+                        <p class="small text-muted mb-0">{{ g.descripcion }}</p>
+                        <div class="d-flex gap-2 mt-3">
+                            <a href="/eliminar_gasto/{{g.id}}" class="btn btn-danger w-100 py-2 rounded-pill text-decoration-none">Sí, borrar</a>
+                            <button class="btn btn-light border w-100 py-2 rounded-pill" data-bs-dismiss="modal">No</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="modalEditGasto{{g.id}}" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <form action="/actualizar_gasto/{{g.id}}" method="POST" class="modal-content border-0 shadow">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title fw-bold"><i class="fas fa-edit me-2"></i>Editar Gasto</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="row g-3 text-start">
+                            <div class="col-md-6">
+                                <label class="small fw-bold">FECHA:</label>
+                                <input type="date" name="fecha" class="form-control" value="{{g.fecha}}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="small fw-bold">CATEGORÍA:</label>
+                                <select name="categoria" class="form-select">
+                                    <option value="Accesorios" {% if g.categoria == 'Accesorios' %}selected{% endif %}>Accesorios</option>
+                                    <option value="Suministros/Limpieza" {% if g.categoria == 'Suministros/Limpieza' %}selected{% endif %}>Suministros/Limpieza</option>
+                                    <option value="Hardware" {% if g.categoria == 'Hardware' %}selected{% endif %}>Hardware</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="small fw-bold">PROVEEDOR:</label>
+                                <input type="text" name="proveedor" class="form-control" value="{{g.proveedor}}" required>
+                            </div>
+                            <div class="col-12">
+                                <label class="small fw-bold">DESCRIPCIÓN:</label>
+                                <input type="text" name="descripcion" class="form-control" value="{{g.descripcion}}" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small fw-bold">CANTIDAD:</label>
+                                <input type="number" name="cantidad" class="form-control" value="{{g.cantidad}}" min="1" required>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="small fw-bold">P. UNITARIO:</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" name="precio_unitario" class="form-control" value="{{g.precio_unitario}}" step="0.01" required>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold">Actualizar Gasto</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% endfor %}
+    {% endfor %}
+</div>
+
         <div class="tab-pane fade" id="boveda">
             <div class="d-flex justify-content-between align-items-center mb-4"><h3>Bóveda Claves</h3><div class="d-flex gap-2"><div class="position-relative"><i class="fas fa-search position-absolute" style="left:12px; top:12px; color:#94a3b8;"></i><input type="text" class="form-control search-input" id="searchBoveda" placeholder="Buscar servicio..."></div><button class="btn btn-danger rounded-pill px-4 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddClave">Nueva Clave</button></div></div>
             <div class="row g-3" id="bovedaCards">{% for c in claves %}<div class="col-md-4 card-item"><div class="card card-custom p-3 border-start border-danger border-4 h-100 position-relative"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="fw-bold mb-0 text-truncate">{{ c.servicio }}</h6><div class="btn-group"><button class="btn btn-sm btn-link text-primary p-1" data-bs-toggle="modal" data-bs-target="#modalEditClave{{c.id}}"><i class="fas fa-edit"></i></button><button class="btn btn-sm btn-link text-muted p-1" data-bs-toggle="modal" data-bs-target="#modalDelClave{{c.id}}"><i class="fas fa-times"></i></button></div></div><small class="text-muted d-block mb-3">{{ c.usuario_acceso }}</small><div class="pass-box d-flex justify-content-between align-items-center shadow-sm"><code class="text-danger fw-bold" id="pass{{ c.id }}" data-real="{{ c.password_acceso }}">********</code><button class="btn btn-sm text-muted p-0" onclick="togglePass('{{ c.id }}')"><i class="fas fa-eye"></i></button></div></div></div>{% endfor %}</div>
@@ -319,6 +458,58 @@
             </div>
             <div class="modal-footer">
                 <button type="submit" class="btn btn-success w-100 rounded-pill shadow">Guardar Registro</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="modalAddGasto" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="/agregar_gasto" method="POST" class="modal-content border-0 shadow">
+            <div class="modal-header bg-warning text-dark fw-bold">
+                <h5 class="modal-title">Registrar Nueva Compra</h5>
+            </div>
+            <div class="modal-body p-4">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="small fw-bold">FECHA:</label>
+                        <input type="date" name="fecha" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-bold">CATEGORÍA:</label>
+                        <select name="categoria" class="form-select">
+                            <option value="Accesorios">Accesorios</option>
+                            <option value="Suministros/Limpieza">Suministros/Limpieza</option>
+                            <option value="Hardware">Hardware</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="small fw-bold">PROVEEDOR:</label>
+                        <input type="text" name="proveedor" class="form-control" placeholder="Ej. Amazon, PCEL..." required>
+                    </div>
+                    <div class="col-12">
+                        <label class="small fw-bold">DESCRIPCIÓN DEL ARTÍCULO:</label>
+                        <input type="text" name="descripcion" class="form-control" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="small fw-bold">CANTIDAD:</label>
+                        <input type="number" name="cantidad" class="form-control" value="1" min="1" required>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="small fw-bold">PRECIO UNITARIO:</label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number" name="precio_unitario" class="form-control" step="0.01" required>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <label class="small fw-bold">SKU / PARTE (Opcional):</label>
+                        <input type="text" name="sku" class="form-control">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-warning w-100 fw-bold rounded-pill">Guardar en Inventario de Gastos</button>
             </div>
         </form>
     </div>
@@ -488,6 +679,26 @@ document.addEventListener('keyup', function (e) {
             const bsTab = new bootstrap.Tab(tabTrigger);
             bsTab.show();
         }
+    }
+});
+
+document.addEventListener('keyup', function (e) {
+    // Escuchamos el buscador de gastos
+    if (e.target && e.target.id === 'searchGastos') {
+        let value = e.target.value.toLowerCase();
+        // Seleccionamos todas las filas de todas las tablas dentro de la pestaña gastos
+        let rows = document.querySelectorAll('#gastos table tbody tr');
+        
+        rows.forEach(row => {
+            // Si la fila es la del TOTAL (tiene la clase table-info), siempre la mostramos
+            if (row.classList.contains('table-info')) {
+                row.style.display = ''; 
+            } else {
+                // Filtramos por el contenido de la fila
+                let text = row.textContent.toLowerCase();
+                row.style.display = text.indexOf(value) > -1 ? '' : 'none';
+            }
+        });
     }
 });
 

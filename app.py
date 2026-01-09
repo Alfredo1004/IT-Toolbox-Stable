@@ -163,12 +163,40 @@ def dashboard():
     cursor.execute("SELECT * FROM prestamos ORDER BY id DESC"); prestamos = cursor.fetchall()
     cursor.execute("SELECT * FROM wiki ORDER BY categoria ASC, titulo ASC"); wiki = cursor.fetchall()
     cursor.execute("SELECT * FROM celulares ORDER BY id DESC"); celulares = cursor.fetchall()
+
+    # --- DENTRO DE @app.route('/') ---
+# Consulta de gastos calculando el total por fila
+    cursor.execute("SELECT *, (cantidad * precio_unitario) as precio_total FROM gastos ORDER BY fecha DESC")
+    gastos_raw = cursor.fetchall()
+
+# Lógica para agrupar por mes (Enero, Febrero, etc.)
+    gastos_por_mes = {}
+    nombres_meses = ["", "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", 
+                 "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"]
+
+    for g in gastos_raw:
+        # Extraemos el mes de la fecha (formato YYYY-MM-DD)
+        mes_num = int(g['fecha'].split('-')[1]) 
+        mes_nombre = nombres_meses[mes_num]
+        
+        if mes_nombre not in gastos_por_mes:
+           # CAMBIAMOS 'items' por 'lista'
+           gastos_por_mes[mes_nombre] = {'lista': [], 'total_mes': 0}
+    
+        # CAMBIAMOS 'items' por 'lista'
+        gastos_por_mes[mes_nombre]['lista'].append(g)
+        gastos_por_mes[mes_nombre]['total_mes'] += g['precio_total']
+
+        gastos_ordenados = dict(sorted(gastos_por_mes.items(), 
+                                      key=lambda x: nombres_meses.index(x[0])))
+
+# RECUERDA: Añade 'gastos_por_mes=gastos_por_mes' al render_template de esta función
     
     cursor.execute("SELECT COUNT(*) FROM incidencias WHERE solucion = 'Solucionado'"); sol = cursor.fetchone()[0]
     stats_tickets = [sol, pend]; stats_manto = [len(manto)]
     conn.close()
     return render_template('toolbox.html', resumen={'equipos': total_eq, 'pendientes': pend, 'vencidos': venc},
-                           tickets=t_procesados, equipos=equipos, celulares=celulares, claves=claves, mantenimientos=manto, 
+                           tickets=t_procesados, equipos=equipos, celulares=celulares, gastos_por_mes=gastos_ordenados, claves=claves, mantenimientos=manto, 
                            notas=notas, prestamos=prestamos, wiki=wiki, fecha_actual=hoy, 
                            stats_tickets=stats_tickets, stats_manto=stats_manto, pendientes_count=pend)
 
@@ -352,6 +380,56 @@ def eliminar_celular(id):
     cursor.execute("DELETE FROM celulares WHERE id=?", (id,))
     conn.commit(); conn.close()
     return redirect(url_for('dashboard', tab='celulares'))
+
+@app.route('/agregar_gasto', methods=['POST'])
+@login_required
+def agregar_gasto():
+    fecha = request.form.get('fecha')
+    proveedor = request.form.get('proveedor')
+    categoria = request.form.get('categoria')
+    descripcion = request.form.get('descripcion')
+    sku = request.form.get('sku')
+    cantidad = int(request.form.get('cantidad', 1))
+    precio_unitario = float(request.form.get('precio_unitario', 0))
+
+    conn = conectar_db(); cursor = conn.cursor()
+    cursor.execute("""INSERT INTO gastos 
+        (fecha, proveedor, categoria, descripcion, sku, cantidad, precio_unitario) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)""", 
+        (fecha, proveedor, categoria, descripcion, sku, cantidad, precio_unitario))
+    conn.commit(); conn.close()
+    
+    # Redirigimos y mantenemos la pestaña de gastos abierta
+    return redirect(url_for('dashboard', tab='gastos'))
+
+@app.route('/eliminar_gasto/<int:id>')
+@login_required
+def eliminar_gasto(id):
+    conn = conectar_db(); cursor = conn.cursor()
+    cursor.execute("DELETE FROM gastos WHERE id=?", (id,))
+    conn.commit(); conn.close()
+    
+    # Redirigimos de vuelta a la pestaña de gastos
+    return redirect(url_for('dashboard', tab='gastos'))
+
+@app.route('/actualizar_gasto/<int:id>', methods=['POST'])
+@login_required
+def actualizar_gasto(id):
+    fecha = request.form.get('fecha')
+    proveedor = request.form.get('proveedor')
+    categoria = request.form.get('categoria')
+    descripcion = request.form.get('descripcion')
+    cantidad = int(request.form.get('cantidad'))
+    precio_unitario = float(request.form.get('precio_unitario'))
+
+    conn = conectar_db(); cursor = conn.cursor()
+    cursor.execute("""UPDATE gastos SET 
+                   fecha=?, proveedor=?, categoria=?, descripcion=?, cantidad=?, precio_unitario=? 
+                   WHERE id=?""", 
+                   (fecha, proveedor, categoria, descripcion, cantidad, precio_unitario, id))
+    conn.commit(); conn.close()
+    
+    return redirect(url_for('dashboard', tab='gastos'))
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
