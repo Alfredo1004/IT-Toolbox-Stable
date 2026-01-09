@@ -162,12 +162,13 @@ def dashboard():
     cursor.execute("SELECT * FROM notas ORDER BY id DESC"); notas = cursor.fetchall()
     cursor.execute("SELECT * FROM prestamos ORDER BY id DESC"); prestamos = cursor.fetchall()
     cursor.execute("SELECT * FROM wiki ORDER BY categoria ASC, titulo ASC"); wiki = cursor.fetchall()
+    cursor.execute("SELECT * FROM celulares ORDER BY id DESC"); celulares = cursor.fetchall()
     
     cursor.execute("SELECT COUNT(*) FROM incidencias WHERE solucion = 'Solucionado'"); sol = cursor.fetchone()[0]
     stats_tickets = [sol, pend]; stats_manto = [len(manto)]
     conn.close()
     return render_template('toolbox.html', resumen={'equipos': total_eq, 'pendientes': pend, 'vencidos': venc},
-                           tickets=t_procesados, equipos=equipos, claves=claves, mantenimientos=manto, 
+                           tickets=t_procesados, equipos=equipos, celulares=celulares, claves=claves, mantenimientos=manto, 
                            notas=notas, prestamos=prestamos, wiki=wiki, fecha_actual=hoy, 
                            stats_tickets=stats_tickets, stats_manto=stats_manto, pendientes_count=pend)
 
@@ -306,6 +307,51 @@ def descargar_reporte_excel():
     with pd.ExcelWriter(f, engine='openpyxl') as writer:
         df_tickets.to_excel(writer, index=False, sheet_name='Tickets'); df_inv.to_excel(writer, index=False, sheet_name='Inventario')
     return send_file(f, as_attachment=True)
+
+@app.route('/agregar_celular', methods=['POST'])
+@login_required
+def agregar_celular():
+    usuario = request.form.get('usuario')
+    marca_modelo = request.form.get('marca_modelo')
+    imei = request.form.get('imei')
+    numero_tel = request.form.get('numero_tel')
+    fecha_asig = request.form.get('fecha_asig')
+    comentarios = request.form.get('comentarios')
+
+    conn = conectar_db(); cursor = conn.cursor()
+    cursor.execute("""INSERT INTO celulares 
+                   (usuario, marca_modelo, imei, numero_tel, fecha_asignacion, comentarios) 
+                   VALUES (?, ?, ?, ?, ?, ?)""", 
+                   (usuario, marca_modelo, imei, numero_tel, fecha_asig, comentarios))
+    conn.commit(); conn.close()
+    return redirect(url_for('dashboard', tab='celulares'))
+
+@app.route('/actualizar_celular/<int:id>', methods=['POST'])
+@login_required
+def actualizar_celular(id):
+    # Asegúrate de usar los 'name' que pusiste en los inputs del HTML
+    usuario = request.form.get('usuario')
+    marca_modelo = request.form.get('marca_modelo')
+    imei = request.form.get('imei')
+    numero_tel = request.form.get('numero_tel')
+    fecha_asignacion = request.form.get('fecha_asig') # Este viene del input name="fecha_asig"
+    comentarios = request.form.get('comentarios')
+
+    conn = conectar_db(); cursor = conn.cursor()
+    cursor.execute("""UPDATE celulares SET 
+                   usuario=?, marca_modelo=?, imei=?, numero_tel=?, fecha_asignacion=?, comentarios=? 
+                   WHERE id=?""", 
+                   (usuario, marca_modelo, imei, numero_tel, fecha_asignacion, comentarios, id))
+    conn.commit(); conn.close()
+    return redirect(url_for('dashboard', tab='celulares'))
+
+@app.route('/eliminar_celular/<int:id>')
+@login_required
+def eliminar_celular(id):
+    conn = conectar_db(); cursor = conn.cursor()
+    cursor.execute("DELETE FROM celulares WHERE id=?", (id,))
+    conn.commit(); conn.close()
+    return redirect(url_for('dashboard', tab='celulares'))
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

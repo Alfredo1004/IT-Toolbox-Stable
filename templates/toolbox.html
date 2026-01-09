@@ -52,6 +52,7 @@
             <span id="sidebar-pend-badge" class="badge rounded-pill bg-danger shadow-sm {% if resumen.pendientes == 0 %}d-none{% endif %}">{{ resumen.pendientes }}</span>
         </a>
         <a class="nav-link" data-bs-toggle="pill" href="#inventario"><i class="fas fa-laptop me-2"></i>Inventario</a>
+        <a class="nav-link" data-bs-toggle="pill" href="#celulares"><i class="fas fa-mobile-alt me-2"></i>Celulares</a>
         <a class="nav-link" data-bs-toggle="pill" href="#boveda"><i class="fas fa-key me-2"></i>Bóveda Claves</a>
         <a class="nav-link" data-bs-toggle="pill" href="#prestamos"><i class="fas fa-hand-holding-heart me-2"></i>Préstamos</a>
         <a class="nav-link" data-bs-toggle="pill" href="#wiki"><i class="fas fa-book-open me-2"></i>Wiki Técnica</a>
@@ -163,6 +164,54 @@
             </table></div>
         </div>
 
+        <div class="tab-pane fade" id="celulares">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>Inventario de Celulares</h3>
+        <div class="d-flex gap-2">
+            <div class="position-relative">
+                <i class="fas fa-search position-absolute" style="left:12px; top:12px; color:#94a3b8;"></i>
+                <input type="text" class="form-control search-input" id="searchCelulares" placeholder="Buscar celular...">
+            </div>
+            <button class="btn btn-success px-4 rounded-pill shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddCel">
+                <i class="fas fa-plus me-1"></i> Agregar Celular
+            </button>
+        </div>
+    </div>
+    <div class="card card-custom p-0 overflow-hidden">
+        <table class="table align-middle m-0 table-small-text" id="tableCelulares">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3">USUARIO</th>
+                    <th>MARCA / MODELO</th>
+                    <th>IMEI</th>
+                    <th>NÚMERO TEL.</th>
+                    <th>ASIGNACIÓN</th>
+                    <th>COMENTARIOS</th>
+                    <th class="text-end">ACCIONES</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in celulares %}
+                <tr>
+                    <td class="ps-3"><strong>{{ c.usuario }}</strong></td>
+                    <td><span class="badge bg-light text-dark border">{{ c.marca_modelo }}</span></td>
+                    <td><small class="text-muted">{{ c.imei or '-' }}</small></td>
+                    <td><code class="mac-style">{{ c.numero_tel or 'N/A' }}</code></td>
+                    <td>{{ c.fecha_asignacion or '-' }}</td>
+                    <td><small class="text-muted">{{ c.comentarios or '-' }}</small></td>
+                    <td class="text-end pe-3">
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEditCel{{c.id}}"><i class="fas fa-cog"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalDelCel{{c.id}}"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
         <div class="tab-pane fade" id="boveda">
             <div class="d-flex justify-content-between align-items-center mb-4"><h3>Bóveda Claves</h3><div class="d-flex gap-2"><div class="position-relative"><i class="fas fa-search position-absolute" style="left:12px; top:12px; color:#94a3b8;"></i><input type="text" class="form-control search-input" id="searchBoveda" placeholder="Buscar servicio..."></div><button class="btn btn-danger rounded-pill px-4 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddClave">Nueva Clave</button></div></div>
             <div class="row g-3" id="bovedaCards">{% for c in claves %}<div class="col-md-4 card-item"><div class="card card-custom p-3 border-start border-danger border-4 h-100 position-relative"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="fw-bold mb-0 text-truncate">{{ c.servicio }}</h6><div class="btn-group"><button class="btn btn-sm btn-link text-primary p-1" data-bs-toggle="modal" data-bs-target="#modalEditClave{{c.id}}"><i class="fas fa-edit"></i></button><button class="btn btn-sm btn-link text-muted p-1" data-bs-toggle="modal" data-bs-target="#modalDelClave{{c.id}}"><i class="fas fa-times"></i></button></div></div><small class="text-muted d-block mb-3">{{ c.usuario_acceso }}</small><div class="pass-box d-flex justify-content-between align-items-center shadow-sm"><code class="text-danger fw-bold" id="pass{{ c.id }}" data-real="{{ c.password_acceso }}">********</code><button class="btn btn-sm text-muted p-0" onclick="togglePass('{{ c.id }}')"><i class="fas fa-eye"></i></button></div></div></div>{% endfor %}</div>
@@ -200,6 +249,80 @@
 <div class="modal fade" id="modalAddWiki" tabindex="-1"><div class="modal-dialog modal-lg"><form action="/agregar_wiki" method="POST" class="modal-content"><div class="modal-header bg-primary text-white"><h5>Nueva Guía Wiki</h5></div><div class="modal-body p-4"><label class="small fw-bold">TÍTULO:</label><input type="text" name="titulo" class="form-control mb-3" required><label class="small fw-bold">CATEGORÍA:</label><select name="categoria" class="form-select mb-3"><option value="Software">Software</option><option value="Hardware">Hardware</option><option value="Redes">Redes</option><option value="General">General</option></select><label class="small fw-bold">CONTENIDO:</label><textarea name="contenido" class="form-control" rows="8" required></textarea></div><div class="modal-footer"><button type="submit" class="btn btn-primary w-100 rounded-pill shadow">Publicar</button></div></form></div></div>
 <div class="modal fade" id="modalAddManto" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form action="/agregar_mantenimiento" method="POST" class="modal-content"><div class="modal-header bg-success text-white"><h5>Registrar Manto</h5></div><div class="modal-body p-4"><label class="small fw-bold">EQUIPO:</label><select name="equipo_id" class="form-select mb-3">{% for e in equipos %}<option value="{{e.id}}">{{e.nombre_equipo}}</option>{% endfor %}</select><label class="small fw-bold">FECHA:</label><input type="date" name="fecha" class="form-control mb-3" required><label class="small fw-bold">PRÓXIMA:</label><input type="date" name="proxima_fecha" class="form-control mb-3" required><label class="small fw-bold">DETALLES:</label><textarea name="description" class="form-control" required></textarea></div><div class="modal-footer"><button type="submit" class="btn btn-success w-100 rounded-pill shadow">Guardar</button></div></form></div></div>
 <div class="modal fade" id="modalAddPrestamo" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form action="/agregar_prestamo" method="POST" class="modal-content"><div class="modal-header bg-info text-white"><h5>Registrar Préstamo</h5></div><div class="modal-body p-4"><label class="small fw-bold">ARTÍCULO:</label><input type="text" name="articulo" class="form-control mb-3" required><label class="small fw-bold">USUARIO:</label><input type="text" name="usuario" class="form-control mb-3" required><label class="small fw-bold">SALIDA:</label><input type="date" name="salida" class="form-control mb-3" required><label class="small fw-bold">RETORNO:</label><input type="date" name="retorno" class="form-control mb-3" required></div><div class="modal-footer"><button type="submit" class="btn btn-info text-white w-100 rounded-pill shadow">Guardar</button></div></form></div></div>
+
+{% for c in celulares %}
+<div class="modal fade" id="modalEditCel{{c.id}}" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="/actualizar_celular/{{c.id}}" method="POST" class="modal-content">
+            <div class="modal-header bg-primary text-white"><h5>Editar Celular: {{c.usuario}}</h5></div>
+            <div class="modal-body p-4">
+                <div class="row g-3">
+                    <div class="col-12"><label class="small fw-bold">USUARIO:</label><input type="text" name="usuario" class="form-control" value="{{c.usuario}}" required></div>
+                    <div class="col-md-6"><label class="small fw-bold">MARCA / MODELO:</label><input type="text" name="marca_modelo" class="form-control" value="{{c.marca_modelo}}" required></div>
+                    <div class="col-md-6"><label class="small fw-bold">NÚMERO:</label><input type="text" name="numero_tel" class="form-control" value="{{c.numero_tel or ''}}"></div>
+                    <div class="col-12"><label class="small fw-bold">IMEI:</label><input type="text" name="imei" class="form-control" value="{{c.imei or ''}}"></div>
+                    <div class="col-12"><label class="small fw-bold">FECHA ASIGNACIÓN:</label><input type="date" name="fecha_asig" class="form-control" value="{{c.fecha_asignacion or ''}}"></div>
+                    <div class="col-12"><label class="small fw-bold">COMENTARIOS:</label><textarea name="comentarios" class="form-control">{{c.comentarios or ''}}</textarea></div>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-primary w-100 rounded-pill shadow">Actualizar Cambios</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="modalDelCel{{c.id}}" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content p-4 text-center">
+            <h6>¿Borrar registro de {{c.usuario}}?</h6>
+            <div class="d-flex gap-2 mt-3">
+                <a href="/eliminar_celular/{{c.id}}" class="btn btn-danger w-100 py-2 rounded">Sí, borrar</a>
+                <button class="btn btn-light border w-100" data-bs-dismiss="modal">No</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<div class="modal fade" id="modalAddCel" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="/agregar_celular" method="POST" class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Registrar Nuevo Celular</h5>
+            </div>
+            <div class="modal-body p-4">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="small fw-bold">USUARIO:</label>
+                        <input type="text" name="usuario" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-bold">MARCA / MODELO:</label>
+                        <input type="text" name="marca_modelo" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-bold">NÚMERO:</label>
+                        <input type="text" name="numero_tel" class="form-control">
+                    </div>
+                    <div class="col-12">
+                        <label class="small fw-bold">IMEI:</label>
+                        <input type="text" name="imei" class="form-control">
+                    </div>
+                    <div class="col-12">
+                        <label class="small fw-bold">FECHA ASIGNACIÓN:</label>
+                        <input type="date" name="fecha_asig" class="form-control">
+                    </div>
+                    <div class="col-12">
+                        <label class="small fw-bold">COMENTARIOS:</label>
+                        <textarea name="comentarios" class="form-control"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-success w-100 rounded-pill shadow">Guardar Registro</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <div class="modal fade" id="modalSoftware" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header bg-info text-white"><h5 class="modal-title" id="softTitle">Software Instalado</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body p-0"><table class="table m-0"><thead class="table-light sticky-top"><tr><th class="ps-3">Programa</th><th>Versión</th></tr></thead><tbody id="softTableBody"></tbody></table></div></div></div></div>
 
@@ -314,6 +437,22 @@
             });
         });
 
+       // Filtro para celulares con protección de errores
+document.addEventListener('keyup', function (e) {
+    // Si el elemento que activó el evento es el buscador de celulares
+    if (e.target && e.target.id === 'searchCelulares') {
+        let value = e.target.value.toLowerCase();
+        // Buscamos específicamente en el cuerpo de la tabla de celulares
+        let rows = document.querySelectorAll('#tableCelulares tbody tr');
+        
+        rows.forEach(row => {
+            // Verificamos si el texto de la fila incluye lo que escribimos
+            let text = row.textContent.toLowerCase();
+            row.style.display = text.indexOf(value) > -1 ? '' : 'none';
+        });
+    }
+});
+
         // Inicializar buscadores
         setupSearch('searchTickets', '#tableTickets tbody tr', true);
         setupSearch('searchInventario', '#tableInventario tbody tr', true);
@@ -338,6 +477,20 @@
             console.error("Error inicializando gráficas:", e);
         }
     });
+
+    document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get('tab');
+    if (tab) {
+        // Busca el botón de la pestaña y simula un clic
+        const tabTrigger = document.querySelector(`[href="#${tab}"]`);
+        if (tabTrigger) {
+            const bsTab = new bootstrap.Tab(tabTrigger);
+            bsTab.show();
+        }
+    }
+});
+
 </script>
 </body>
 </html>
