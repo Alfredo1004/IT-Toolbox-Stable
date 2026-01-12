@@ -191,14 +191,21 @@ def dashboard():
 
         gastos_ordenados = dict(sorted(gastos_por_mes.items(), 
                                       key=lambda x: nombres_meses.index(x[0])))
+        
+        # 1. Nueva consulta para la gráfica de gastos por categoría
+    cursor.execute("SELECT categoria, SUM(cantidad * precio_unitario) FROM gastos GROUP BY categoria")
+    gastos_grafica_raw = cursor.fetchall()
 
-# RECUERDA: Añade 'gastos_por_mes=gastos_por_mes' al render_template de esta función
-    
+        # 2. Preparamos las listas para Chart.js (si no hay gastos, enviamos listas vacías para evitar errores)
+    labels_gastos = [row[0] for row in gastos_grafica_raw] if gastos_grafica_raw else []
+    data_gastos = [row[1] for row in gastos_grafica_raw] if gastos_grafica_raw else []
+
+        # RECUERDA: Añade 'gastos_por_mes=gastos_por_mes' al render_template de esta función 
     cursor.execute("SELECT COUNT(*) FROM incidencias WHERE solucion = 'Solucionado'"); sol = cursor.fetchone()[0]
     stats_tickets = [sol, pend]; stats_manto = [len(manto)]
     conn.close()
     return render_template('toolbox.html', resumen={'equipos': total_eq, 'pendientes': pend, 'vencidos': venc},
-                           tickets=t_procesados, equipos=equipos, celulares=celulares, gastos_por_mes=gastos_ordenados, claves=claves, mantenimientos=manto, 
+                           tickets=t_procesados, equipos=equipos, celulares=celulares, gastos_por_mes=gastos_ordenados, labels_gastos=labels_gastos, data_gastos=data_gastos, claves=claves, mantenimientos=manto, 
                            notas=notas, prestamos=prestamos, wiki=wiki, fecha_actual=hoy, 
                            stats_tickets=stats_tickets, stats_manto=stats_manto, pendientes_count=pend)
 
@@ -332,10 +339,46 @@ def backup_db(): return send_file(os.path.join(BASE_DIR, 'soporte.db'), as_attac
 @app.route('/descargar_reporte_excel')
 @login_required
 def descargar_reporte_excel():
-    conn = conectar_db(); df_tickets = pd.read_sql_query("SELECT id as Folio, equipo, usuario, problema as Falla, comentarios as Solucion, solucion as Estado, fecha FROM incidencias", conn)
-    df_inv = pd.read_sql_query("SELECT * FROM inventario", conn); conn.close(); f = "Reporte_TI_Master.xlsx"
+    conn = conectar_db()
+    
+    # Consultas simplificadas para evitar errores de nombres de columnas
+    df_tickets = pd.read_sql_query("SELECT id as Folio, equipo as Equipo, usuario as Usuario, problema as Falla, fecha as Fecha FROM incidencias", conn)
+    
+    # En Inventario usamos '*' para traer todo y evitar el error 'no such column'
+    df_inv = pd.read_sql_query("SELECT * FROM inventario", conn)
+    
+    df_cel = pd.read_sql_query("SELECT * FROM celulares", conn)
+    
+    # Para gastos, calculamos el total directamente
+    df_gastos = pd.read_sql_query("SELECT fecha as Fecha, proveedor as Proveedor, categoria as Categoria, descripcion as Articulo, cantidad as Cant, precio_unitario as Unitario, (cantidad * precio_unitario) as Total FROM gastos", conn)
+    
+    conn.close()
+
+    # Añadir fila de TOTAL al final de Gastos
+    if not df_gastos.empty:
+        total_suma = df_gastos['Total'].sum()
+        fila_total = pd.DataFrame([['', '', '', 'TOTAL GENERAL:', '', '', total_suma]], columns=df_gastos.columns)
+        df_gastos = pd.concat([df_gastos, fila_total], ignore_index=True)
+
+    f = "Reporte_TI_Master.xlsx"
+    
     with pd.ExcelWriter(f, engine='openpyxl') as writer:
-        df_tickets.to_excel(writer, index=False, sheet_name='Tickets'); df_inv.to_excel(writer, index=False, sheet_name='Inventario')
+        df_tickets.to_excel(writer, index=False, sheet_name='Tickets')
+        df_inv.to_excel(writer, index=False, sheet_name='Inventario_Hardware')
+        df_cel.to_excel(writer, index=False, sheet_name='Inventario_Celulares')
+        df_gastos.to_excel(writer, index=False, sheet_name='Reporte_Gastos')
+        
+        # Auto-ajuste de columnas profesional
+        for sheetname in writer.sheets:
+            worksheet = writer.sheets[sheetname]
+            for col in worksheet.columns:
+                max_length = 0
+                column = col[0].column_letter
+                for cell in col:
+                    if cell.value:
+                        max_length = max(max_length, len(str(cell.value)))
+                worksheet.column_dimensions[column].width = max_length + 2
+
     return send_file(f, as_attachment=True)
 
 @app.route('/agregar_celular', methods=['POST'])

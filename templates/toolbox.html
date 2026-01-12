@@ -376,8 +376,42 @@
         </div>
 
         <div class="tab-pane fade" id="reportes">
-            <div class="d-flex justify-content-between align-items-center mb-4"><h3>IT Analytics</h3><a href="/descargar_reporte_excel" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">Excel</a></div>
-            <div class="row g-4"><div class="col-md-6 text-center"><div class="card card-custom p-4"><h6>ESTADO TICKETS</h6><div style="height:250px;"><canvas id="chartTickets"></canvas></div></div></div><div class="col-md-6 text-center"><div class="card card-custom p-4"><h6>MANTENIMIENTOS</h6><div style="height:250px;"><canvas id="chartManto"></canvas></div></div></div></div>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold">IT Analytics & Reporting</h3>
+        <a href="/descargar_reporte_excel" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
+            <i class="fas fa-file-excel me-2"></i>Descargar Excel Maestro
+        </a>
+    </div>
+    
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card card-custom p-4 shadow-sm border-0 h-100">
+                <h6 class="fw-bold text-muted text-center mb-3">ESTADO TICKETS</h6>
+                <div style="position: relative; height:200px;">
+                    <canvas id="chartTickets"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card card-custom p-4 shadow-sm border-0 h-100">
+                <h6 class="fw-bold text-muted text-center mb-3">MANTENIMIENTOS</h6>
+                <div style="position: relative; height:200px;">
+                    <canvas id="chartManto"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card card-custom p-4 shadow-sm border-0 h-100">
+                <h6 class="fw-bold text-muted text-center mb-3">GASTOS POR CATEGORÍA</h6>
+                <div style="position: relative; height:200px;">
+                    <canvas id="chartGastos" 
+                            data-labels='{{ labels_gastos | tojson }}' 
+                            data-values='{{ data_gastos | tojson }}'>
+                    </canvas>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -668,6 +702,36 @@ document.addEventListener('keyup', function (e) {
             console.error("Error inicializando gráficas:", e);
         }
     });
+
+            // --- NUEVA GRÁFICA DE GASTOS (Versión compatible con VS Code) ---
+document.addEventListener('DOMContentLoaded', function() {
+    const canvasG = document.getElementById('chartGastos');
+    if (canvasG) {
+        const ctxG = canvasG.getContext('2d');
+        const labelsG = JSON.parse(canvasG.getAttribute('data-labels') || '[]');
+        const valuesG = JSON.parse(canvasG.getAttribute('data-values') || '[]');
+
+        new Chart(ctxG, {
+            type: 'doughnut',
+            data: {
+                labels: labelsG,
+                datasets: [{
+                    data: valuesG,
+                    backgroundColor: ['#ffc107', '#0d6efd', '#198754', '#dc3545', '#6c757d'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } }
+                }
+            }
+        });
+    }
+});
+
 
     document.addEventListener('DOMContentLoaded', function() {
     const urlParams = new URLSearchParams(window.location.search);
