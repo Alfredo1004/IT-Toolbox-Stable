@@ -35,12 +35,71 @@
     .borde-prohibido { border-left: 5px solid #dc3545 !important; }
     .borde-normal { border-left: 5px solid transparent !important; }
 </style>
+
+<style>
+    /* --- Estructura Base y Escritorio --- */
+    .sidebar { 
+        background: var(--it-side); 
+        color: white; 
+        min-height: 100vh; 
+        position: fixed; 
+        width: 250px; 
+        padding: 25px; 
+        z-index: 1050; 
+        transition: all 0.3s ease-in-out;
+        left: 0; 
+    }
+
+    .main-content { 
+        margin-left: 250px; 
+        padding: 40px; 
+        width: calc(100% - 250px); 
+        transition: all 0.3s ease-in-out; 
+    }
+
+    .sidebar.collapsed { left: -250px; }
+    .main-content.expanded { margin-left: 0; width: 100%; }
+
+    /* --- RESPONSIVIDAD MÓVIL (Celulares) --- */
+    @media (max-width: 992px) {
+        .sidebar { left: -250px !important; } 
+        .sidebar.active { left: 0 !important; } 
+        
+        .main-content { 
+            margin-left: 0 !important; 
+            width: 100% !important; 
+            padding: 20px;
+            padding-top: 80px !important; /* Espacio para el botón flotante */
+        }
+
+        /* Botón Flotante en la esquina superior derecha */
+        #sidebarToggle {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            z-index: 1100;
+            width: auto !important;
+            padding: 10px 18px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
+        }
+    }
+
+    /* Capa oscura de fondo */
+    .sidebar-overlay {
+        display: none; position: fixed; top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.5); z-index: 1040;
+    }
+    .sidebar-overlay.active { display: block; }
+</style>
+
 </head>
 <body>
-
+   
 <audio id="notifSound" preload="auto"><source src="/static/sounds/notify.mp3" type="audio/mpeg"></audio>
 
-<div class="sidebar">
+<div class="sidebar" id="sidebar">
     <h4 class="fw-bold mb-2"><i class="fas fa-toolbox text-primary me-2"></i> IT Toolbox</h4>
     <p class="small text-muted mb-4" style="font-size: 0.7rem;">SISTEMA DE GESTIÓN TÉCNICA</p>
     <a href="/descargar_agente" class="btn btn-primary btn-sm w-100 mb-2 rounded-pill fw-bold py-2 shadow-sm"><i class="fas fa-download me-1"></i> Bajar Agente</a>
@@ -61,6 +120,8 @@
         <a class="nav-link" data-bs-toggle="pill" href="#reportes"><i class="fas fa-chart-pie me-2"></i>Reportes IT</a>
     </nav>
 
+
+
     <hr class="text-muted mt-auto">
     <div class="d-flex align-items-center mb-3 px-2">
         <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 38px; height: 38px;"><i class="fas fa-user-shield text-white"></i></div>
@@ -72,7 +133,11 @@
     <a href="/logout" class="nav-link text-danger small p-2 fw-bold text-decoration-none"><i class="fas fa-sign-out-alt me-2"></i>CERRAR SESIÓN</a>
 </div>
 
-<div class="main-content">
+<div class="main-content" id="content">
+    <button class="btn btn-dark shadow-sm mb-4" id="sidebarToggle">
+    <i class="fas fa-bars me-2"></i> <span id="btnText">Mostrar Menú</span>
+    </button>
+
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
@@ -87,8 +152,26 @@
 
     <div id="notes-section">
         <div class="card card-custom p-3 border-start border-primary border-4 shadow-sm mb-4">
-            <div class="d-flex justify-content-between align-items-center mb-3"><h5 class="fw-bold mb-0"><i class="fas fa-sticky-note text-warning me-2"></i>Notas Rápidas</h5><form action="/agregar_nota" method="POST" class="d-flex gap-2 w-50"><input type="text" name="contenido" class="form-control form-control-sm border-0 bg-light" placeholder="Anotación..." required><button type="submit" class="btn btn-primary btn-sm rounded-circle"><i class="fas fa-plus"></i></button></form></div>
-            <div class="d-flex flex-wrap gap-2">{% for n in notas %}<div class="badge bg-light text-dark p-2 border d-flex align-items-center gap-2 shadow-sm"><span>{{ n.contenido }}</span><small class="text-muted" style="font-size: 0.65rem;">{{ n.fecha }}</small><a href="/eliminar_nota/{{ n.id }}" class="text-danger ms-1" style="text-decoration:none;">&times;</a></div>{% endfor %}</div>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0">
+                    <i class="fas fa-sticky-note text-warning me-2"></i>Notas Rápidas
+                </h5>
+                <form action="/agregar_nota" method="POST" class="d-flex gap-2 w-50">
+                    <input type="text" name="contenido" class="form-control form-control-sm border-0 bg-light" placeholder="Anotación..." required>
+                    <button type="submit" class="btn btn-primary btn-sm rounded-circle">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </form>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                {% for n in notas %}
+                <div class="badge bg-light text-dark p-2 border d-flex align-items-center gap-2 shadow-sm">
+                    <span>{{ n.contenido }}</span>
+                    <small class="text-muted" style="font-size: 0.65rem;">{{ n.fecha }}</small>
+                    <a href="/eliminar_nota/{{ n.id }}" class="text-danger ms-1" style="text-decoration:none;">&times;</a>
+                </div>
+                {% endfor %}
+            </div>
         </div>
     </div>
 
@@ -764,6 +847,73 @@ document.addEventListener('keyup', function (e) {
             }
         });
     }
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    const toggle = document.getElementById('sidebarToggle');
+    const sidebar = document.getElementById('sidebar');
+    const content = document.getElementById('content');
+    const overlay = document.getElementById('overlay');
+    const btnText = document.getElementById('btnText');
+
+    // Función maestra para sincronizar el texto del botón
+    function actualizarTexto() {
+        const isMobile = window.innerWidth <= 992;
+        
+        if (isMobile) {
+            // En móvil, si tiene 'active' está visible, si no, está oculto
+            if (sidebar.classList.contains('active')) {
+                btnText.innerText = "Mostrar Menú";
+            } else {
+                btnText.innerText = "Ocultar Menú";
+            }
+        } else {
+            // En PC, si tiene 'collapsed' está oculto, si no, está visible
+            if (sidebar.classList.contains('collapsed')) {
+                btnText.innerText = "Mostrar Menú";
+            } else {
+                btnText.innerText = "Ocultar Menú";
+            }
+        }
+    }
+
+    // Evento principal del botón
+    toggle.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (window.innerWidth > 992) {
+            sidebar.classList.toggle('collapsed');
+            content.classList.toggle('expanded');
+        } else {
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
+        // Esperamos un instante a que las clases se apliquen para actualizar el texto
+        setTimeout(actualizarTexto, 10);
+    });
+
+    // Cerrar al tocar el fondo oscuro
+    overlay.addEventListener('click', function () {
+        sidebar.classList.remove('active');
+        overlay.classList.remove('active');
+        actualizarTexto();
+    });
+
+    // Sincronizar texto si el usuario cambia el tamaño de la ventana (redimensionar)
+    window.addEventListener('resize', actualizarTexto);
+
+    // Cerrar automáticamente al elegir una sección en el menú (móvil)
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 992) {
+                sidebar.classList.remove('active');
+                overlay.classList.remove('active');
+                actualizarTexto();
+            }
+        });
+    });
+
+    // Ejecución inicial al cargar la página
+    actualizarTexto();
 });
 
 </script>
