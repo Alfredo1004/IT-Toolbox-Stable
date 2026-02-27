@@ -156,7 +156,9 @@
                 <h5 class="fw-bold mb-0">
                     <i class="fas fa-sticky-note text-warning me-2"></i>Notas Rápidas
                 </h5>
-                <form action="/agregar_nota" method="POST" class="d-flex gap-2 w-50">
+                <form action="/agregar_nota" method="POST" id="form-notas" class="d-flex gap-2 w-50">
+                    <input type="hidden" name="tab_actual" id="tab_actual" value="tickets">
+    
                     <input type="text" name="contenido" class="form-control form-control-sm border-0 bg-light" placeholder="Anotación..." required>
                     <button type="submit" class="btn btn-primary btn-sm rounded-circle">
                         <i class="fas fa-plus"></i>
@@ -168,7 +170,7 @@
                 <div class="badge bg-light text-dark p-2 border d-flex align-items-center gap-2 shadow-sm">
                     <span>{{ n.contenido }}</span>
                     <small class="text-muted" style="font-size: 0.65rem;">{{ n.fecha }}</small>
-                    <a href="/eliminar_nota/{{ n.id }}" class="text-danger ms-1" style="text-decoration:none;">&times;</a>
+                    <a href="/eliminar_nota/{{ n.id }}" class="text-danger ms-1" onclick="this.href+='?tab='+document.getElementById('tab_actual').value" style="text-decoration:none;">&times;</a>
                 </div>
                 {% endfor %}
             </div>
@@ -733,17 +735,34 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        // PERSISTENCIA DE PESTAÑAS (HASH)
+    // 1. LÓGICA DE PERSISTENCIA DE PESTAÑAS (MÁS FUERTE)
+    function activarTabDesdeHash() {
         const hash = window.location.hash;
         if (hash) {
-            const triggerEl = document.querySelector(`.nav-link[href="${hash}"]`);
-            if (triggerEl) bootstrap.Tab.getOrCreateInstance(triggerEl).show();
+            const tabBtn = document.querySelector(`.nav-link[href="${hash}"]`);
+            if (tabBtn) {
+                const tab = new bootstrap.Tab(tabBtn);
+                tab.show();
+                // Actualizar el input hidden al cargar si hay un hash
+                document.getElementById('tab_actual').value = hash.replace('#', '');
+            }
         }
-        document.querySelectorAll('.nav-link[data-bs-toggle="pill"]').forEach(tab => {
-            tab.addEventListener('shown.bs.tab', (e) => { 
-                window.location.hash = e.target.getAttribute('href'); 
-            });
+    }
+
+    // Ejecutar al cargar la página
+    activarTabDesdeHash();
+
+    const tabLinks = document.querySelectorAll('.nav-link[data-bs-toggle="pill"]');
+    tabLinks.forEach(link => {
+        link.addEventListener('shown.bs.tab', (e) => {
+            const targetHash = e.target.getAttribute('href');
+            history.replaceState(null, null, targetHash);
+            
+            // ACTUALIZACIÓN QUIRÚRGICA DEL INPUT HIDDEN
+            const tabName = targetHash.replace('#', '');
+            document.getElementById('tab_actual').value = tabName;
         });
+    });
 
        // Filtro para celulares con protección de errores
 document.addEventListener('keyup', function (e) {

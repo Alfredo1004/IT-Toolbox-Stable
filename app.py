@@ -306,12 +306,26 @@ def eliminar_prestamo(id):
 @app.route('/agregar_nota', methods=['POST'])
 @login_required
 def agregar_nota():
-    conn = conectar_db(); conn.execute("INSERT INTO notas (contenido, fecha) VALUES (?,?)", (request.form['contenido'], datetime.now().strftime('%d/%m %H:%M'))); conn.commit(); conn.close(); return redirect('/')
+    # Capturamos la pestaña actual enviada desde el campo oculto del HTML
+    tab_destino = request.form.get('tab_actual', 'tickets') 
+    conn = conectar_db()
+    conn.execute("INSERT INTO notas (contenido, fecha) VALUES (?,?)", 
+                 (request.form['contenido'], datetime.now().strftime('%d/%m %H:%M')))
+    conn.commit()
+    conn.close()
+    # Redirigimos al dashboard pasando el parámetro de la pestaña para que el JS la abra
+    return redirect(url_for('dashboard', tab=tab_destino))
 
 @app.route('/eliminar_nota/<int:id>')
 @login_required
 def eliminar_nota(id):
-    conn = conectar_db(); conn.execute("DELETE FROM notas WHERE id=?", (id,)); conn.commit(); conn.close(); return redirect('/')
+    # Capturamos la pestaña desde la URL (?tab=...)
+    tab_destino = request.args.get('tab', 'tickets')
+    conn = conectar_db()
+    conn.execute("DELETE FROM notas WHERE id=?", (id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('dashboard', tab=tab_destino))
 
 @app.route('/crear_incidencia_manual', methods=['POST'])
 @login_required
