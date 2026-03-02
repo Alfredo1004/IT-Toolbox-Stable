@@ -246,6 +246,7 @@
             <div class="card card-custom p-0 overflow-hidden"><table class="table align-middle m-0 table-small-text" id="tableInventario"><thead class="table-light"><tr><th>HOSTNAME / MARCA</th><th>USUARIO / ASIGNACIÓN</th><th>SERIE / MODELO</th><th>ESPECIFICACIONES</th><th>RED / MAC</th><th>UBICACIÓN</th><th class="text-end">ACCIONES</th></tr></thead>
                 <tbody>{% for e in equipos %}<tr><td class="ps-3"><strong>{{ e.nombre_equipo }}</strong><br><small class="text-primary">{{ e.marca or '-' }}</small></td><td>{{ e.usuario }}<br><small class="text-muted">{{ e.fecha_asignacion or '-' }}</small></td><td><small class="fw-bold">{{ e.n_serie or '-' }}</small><br><small class="text-muted">{{ e.modelo or '-' }}</small></td><td><small class="fw-bold text-dark">{{ e.especificaciones or '-' }}</small></td><td><span class="badge bg-light text-dark border">{{ e.ip_address }}</span><br><code class="mac-style">{{ e.mac_address or 'N/A' }}</code></td><td><span class="badge bg-info text-white">{{ e.ubicacion or '-' }}</span></td><td class="text-end pe-3"><div class="btn-group">
                     <button class="btn btn-sm btn-outline-info" onclick="cargarSoftware('{{e.nombre_equipo}}')" title="Ver Software"><i class="fas fa-microchip"></i></button>
+                    <button class="btn btn-sm btn-outline-dark" data-bs-toggle="modal" data-bs-target="#modalPrintEq{{e.id}}" title="Vista Previa Responsiva"> <i class="fas fa-print"></i></button>
                     <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEditEq{{e.id}}"><i class="fas fa-cog"></i></button><button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalDelEq{{e.id}}"><i class="fas fa-trash"></i></button></div></td></tr>{% endfor %}</tbody>
             </table></div>
         </div>
@@ -272,8 +273,8 @@
                     <th>IMEI</th>
                     <th>NÚMERO TEL.</th>
                     <th>ASIGNACIÓN</th>
-                    <th>COMENTARIOS</th>
-                    <th class="text-end">ACCIONES</th>
+                    <th>UBICACIÓN</th> <th>COMENTARIOS</th>
+                    <th class="text-end pe-3">ACCIONES</th>
                 </tr>
             </thead>
             <tbody>
@@ -284,13 +285,21 @@
                     <td><small class="text-muted">{{ c.imei or '-' }}</small></td>
                     <td><code class="mac-style">{{ c.numero_tel or 'N/A' }}</code></td>
                     <td>{{ c.fecha_asignacion or '-' }}</td>
+                    <td><span class="badge bg-info text-white">{{ c.ubicacion or '-' }}</span></td>
                     <td><small class="text-muted">{{ c.comentarios or '-' }}</small></td>
                     <td class="text-end pe-3">
                         <div class="btn-group">
-                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEditCel{{c.id}}"><i class="fas fa-cog"></i></button>
-                            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalDelCel{{c.id}}"><i class="fas fa-trash"></i></button>
+                            <button class="btn btn-sm btn-outline-dark" data-bs-toggle="modal" data-bs-target="#modalPrintCel{{c.id}}" title="Responsiva">
+                                <i class="fas fa-print"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEditCel{{c.id}}">
+                                <i class="fas fa-cog"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalDelCel{{c.id}}">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         </div>
-                    </td>
+                   </td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -520,10 +529,56 @@
                     <div class="col-md-6"><label class="small fw-bold">NÚMERO:</label><input type="text" name="numero_tel" class="form-control" value="{{c.numero_tel or ''}}"></div>
                     <div class="col-12"><label class="small fw-bold">IMEI:</label><input type="text" name="imei" class="form-control" value="{{c.imei or ''}}"></div>
                     <div class="col-12"><label class="small fw-bold">FECHA ASIGNACIÓN:</label><input type="date" name="fecha_asig" class="form-control" value="{{c.fecha_asignacion or ''}}"></div>
+                    <div class="col-12"> <label class="small fw-bold">UBICACIÓN:</label><input type="text" name="ubicacion" class="form-control" value="{{c.ubicacion or ''}}"></div>
                     <div class="col-12"><label class="small fw-bold">COMENTARIOS:</label><textarea name="comentarios" class="form-control">{{c.comentarios or ''}}</textarea></div>
                 </div>
             </div>
             <div class="modal-footer"><button type="submit" class="btn btn-primary w-100 rounded-pill shadow">Actualizar Cambios</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="modalPrintCel{{c.id}}" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="/generar_responsiva_celular/{{c.id}}" method="POST" class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-file-invoice me-2"></i>Responsiva de Equipo Móvil</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="small fw-bold">RECEPTOR:</label>
+                        <input type="text" name="usuario" class="form-control" value="{{c.usuario}}" required>
+                    </div>
+                    <div class="col-12">
+                        <label class="small fw-bold">MARCA / MODELO:</label>
+                        <input type="text" name="marca_modelo" class="form-control" value="{{c.marca_modelo}}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-bold">IMEI:</label>
+                        <input type="text" name="imei" class="form-control" value="{{c.imei or ''}}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-bold">NÚMERO:</label>
+                        <input type="text" name="numero" class="form-control" value="{{c.numero_tel or ''}}">
+                    </div>
+                    <div class="col-12">
+                        <label class="small fw-bold">UBICACIÓN DE ASIGNACIÓN:</label>
+                        <input type="text" name="ubicacion" class="form-control" value="{{c.ubicacion or ''}}">
+                    </div>
+                    <div class="col-12">
+                        <label class="small fw-bold text-success">COMENTARIOS ADICIONALES:</label>
+                        <textarea name="comentarios" class="form-control" rows="2" placeholder="Ej: Funda protectora, cable original..."></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">Cerrar</button>
+                <button type="submit" class="btn btn-success rounded-pill px-4">
+                    <i class="fas fa-file-pdf me-2"></i>Generar PDF
+                </button>
+            </div>
         </form>
     </div>
 </div>
@@ -568,6 +623,10 @@
                     <div class="col-12">
                         <label class="small fw-bold">FECHA ASIGNACIÓN:</label>
                         <input type="date" name="fecha_asig" class="form-control">
+                    </div>
+                    <div class="col-md-12"> 
+                        <label class="small fw-bold">UBICACIÓN:</label>
+                        <input type="text" name="ubicacion" class="form-control" placeholder="Ej. Monterrey">
                     </div>
                     <div class="col-12">
                         <label class="small fw-bold">COMENTARIOS:</label>
@@ -644,6 +703,55 @@
     <div class="col-md-6"><label class="small fw-bold">IP LOCAL:</label><input type="text" name="ip" class="form-control" value="{{e.ip_address}}"></div><div class="col-md-6"><label class="small fw-bold">RED:</label><select name="red" class="form-select"><option value="Ethernet" {{'selected' if e.tipo_red=='Ethernet'}}>Ethernet</option><option value="Wi-Fi" {{'selected' if e.tipo_red=='Wi-Fi'}}>Wi-Fi</option></select></div>
     <div class="col-12"><label class="small fw-bold">ESPECIFICACIONES:</label><textarea name="specs" class="form-control">{{e.especificaciones}}</textarea></div>
 </div></div><div class="modal-footer"><button type="submit" class="btn btn-primary w-100 rounded-pill shadow">Actualizar</button></div></form></div></div><div class="modal fade" id="modalDelEq{{e.id}}" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content p-4 text-center"><h6>¿Borrar?</h6><div class="d-flex gap-2 mt-3"><a href="/eliminar_equipo/{{e.id}}" class="btn btn-danger w-100 py-2 rounded">Sí</a></div></div></div></div>{% endfor %}
+
+{% for e in equipos %}
+<div class="modal fade" id="modalPrintEq{{e.id}}" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="/generar_responsiva_equipo/{{e.id}}" method="POST" class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="fas fa-file-contract me-2"></i>Vista Previa de Responsiva</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted small">Verifique los datos antes de generar el PDF oficial.</p>
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="small fw-bold">RECEPTOR:</label>
+                        <input type="text" name="usuario" class="form-control" value="{{e.usuario}}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-bold">MARCA:</label>
+                        <input type="text" name="marca" class="form-control" value="{{e.marca or ''}}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-bold">MODELO:</label>
+                        <input type="text" name="modelo" class="form-control" value="{{e.modelo or ''}}">
+                    </div>
+                    <div class="col-12">
+                        <label class="small fw-bold">NÚMERO DE SERIE:</label>
+                        <input type="text" name="serie" class="form-control" value="{{e.n_serie or ''}}">
+                    </div>
+                    <div class="col-12">
+                        <label class="small fw-bold">ESPECIFICACIONES:</label>
+                        <textarea name="specs" class="form-control" rows="2">{{e.especificaciones}}</textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="small fw-bold text-primary">COMENTARIOS / ACCESORIOS:</label>
+                        <textarea name="comentarios" class="form-control" placeholder="Ej: Incluye cargador original, mochila y mouse." rows="2"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-dark rounded-pill px-4">
+                    <i class="fas fa-file-pdf me-2"></i>Generar PDF
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+
 {% for c in claves %}<div class="modal fade" id="modalEditClave{{c.id}}" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form action="/actualizar_clave/{{c.id}}" method="POST" class="modal-content"><div class="modal-header bg-primary text-white"><h5>Editar Credencial</h5></div><div class="modal-body p-4"><label class="small fw-bold">SERVICIO:</label><input type="text" name="servicio" class="form-control mb-3" value="{{c.servicio}}"><label class="small fw-bold">USER:</label><input type="text" name="usuario" class="form-control mb-3" value="{{c.usuario_acceso}}"><label class="small fw-bold">PASS:</label><input type="text" name="password" class="form-control mb-3" value="{{c.password_acceso}}"><label class="small fw-bold">URL:</label><input type="text" name="url" class="form-control" value="{{c.link_url or ''}}"></div><div class="modal-footer"><button type="submit" class="btn btn-primary w-100 rounded-pill shadow">Guardar</button></div></form></div></div><div class="modal fade" id="modalDelClave{{c.id}}" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content p-4 text-center"><h6>¿Borrar?</h6><div class="d-flex gap-2 mt-3"><a href="/eliminar_clave/{{c.id}}" class="btn btn-danger w-100 py-2 rounded">Sí</a></div></div></div></div>{% endfor %}
 {% for m in mantenimientos %}<div class="modal fade" id="modalEditManto{{m.id}}" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form action="/actualizar_mantenimiento/{{m.id}}" method="POST" class="modal-content"><div class="modal-header bg-primary text-white"><h5>Editar Manto</h5></div><div class="modal-body p-4"><label class="small fw-bold">FECHA:</label><input type="date" name="fecha" class="form-control mb-3" value="{{m.fecha_realizado}}"><label class="small fw-bold">PRÓXIMA:</label><input type="date" name="proxima_fecha" class="form-control mb-3" value="{{m.proxima_fecha}}"><label class="small fw-bold">DETALLES:</label><textarea name="description" class="form-control">{{m.descripcion}}</textarea></div><div class="modal-footer"><button type="submit" class="btn btn-primary w-100 rounded-pill shadow">Actualizar</button></div></form></div></div><div class="modal fade" id="modalDelManto{{m.id}}" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content p-4 text-center"><h6>¿Borrar?</h6><div class="d-flex gap-2 mt-3"><a href="/eliminar_mantenimiento/{{m.id}}" class="btn btn-danger w-100 py-2 rounded">Sí</a></div></div></div></div>{% endfor %}
 {% for p in prestamos %}<div class="modal fade" id="modalDelPrestamo{{p.id}}" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content p-4 text-center"><h6>¿Borrar?</h6><div class="d-flex gap-2 mt-3"><a href="/eliminar_prestamo/{{p.id}}" class="btn btn-danger w-100 py-2 rounded">Sí</a></div></div></div></div>{% endfor %}

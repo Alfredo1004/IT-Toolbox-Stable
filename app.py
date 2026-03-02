@@ -3,6 +3,9 @@ from werkzeug.security import check_password_hash
 import sqlite3, json, os, pandas as pd
 from functools import wraps
 from datetime import datetime
+from fpdf import FPDF
+from flask import make_response
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'it_toolbox_secure_key_2025'
@@ -404,10 +407,11 @@ def agregar_celular():
     numero_tel = request.form.get('numero_tel')
     fecha_asig = request.form.get('fecha_asig')
     comentarios = request.form.get('comentarios')
+    ubicacion = request.form.get('ubicacion')
 
     conn = conectar_db(); cursor = conn.cursor()
     cursor.execute("""INSERT INTO celulares 
-                   (usuario, marca_modelo, imei, numero_tel, fecha_asignacion, comentarios) 
+                   (usuario, marca_modelo, imei, numero_tel, fecha_asignacion, ubicacion, comentarios) 
                    VALUES (?, ?, ?, ?, ?, ?)""", 
                    (usuario, marca_modelo, imei, numero_tel, fecha_asig, comentarios))
     conn.commit(); conn.close()
@@ -422,13 +426,15 @@ def actualizar_celular(id):
     imei = request.form.get('imei')
     numero_tel = request.form.get('numero_tel')
     fecha_asignacion = request.form.get('fecha_asig') # Este viene del input name="fecha_asig"
+    ubicacion = request.form.get('ubicacion')
     comentarios = request.form.get('comentarios')
+    
 
     conn = conectar_db(); cursor = conn.cursor()
     cursor.execute("""UPDATE celulares SET 
-                   usuario=?, marca_modelo=?, imei=?, numero_tel=?, fecha_asignacion=?, comentarios=? 
+                   usuario=?, marca_modelo=?, imei=?, numero_tel=?, fecha_asignacion=?, ubicacion=?, comentarios=? 
                    WHERE id=?""", 
-                   (usuario, marca_modelo, imei, numero_tel, fecha_asignacion, comentarios, id))
+                   (usuario, marca_modelo, imei, numero_tel, fecha_asignacion, ubicacion, comentarios, id))
     conn.commit(); conn.close()
     return redirect(url_for('dashboard', tab='celulares'))
 
@@ -489,6 +495,235 @@ def actualizar_gasto(id):
     conn.commit(); conn.close()
     
     return redirect(url_for('dashboard', tab='gastos'))
+
+@app.route('/generar_responsiva_equipo/<int:id>', methods=['POST'])
+@login_required
+def generar_responsiva_equipo(id):
+    # Recibimos los datos editados del modal
+    usuario = request.form.get('usuario')
+    marca = request.form.get('marca')
+    modelo = request.form.get('modelo')
+    serie = request.form.get('serie')
+    specs = request.form.get('specs')
+    comentarios_extra = request.form.get('comentarios', '')
+    fecha_actual = datetime.now().strftime("%d/%m/%Y")
+
+    pdf = FPDF()
+    pdf.add_page()
+
+    pdf.set_font("Arial", '', 10)
+    pdf.cell(190, 10, f"Fecha: {fecha_actual}", 0, 1, 'R')
+    
+    # Encabezado con formato institucional
+    pdf.set_font("Arial", 'B', 14)
+    pdf.cell(190, 10, "RESGUARDO DE EQUIPO TECNOLOGICO", 0, 1, 'C')
+    pdf.ln(5)
+
+    # Cuerpo del texto basado en tu archivo Word
+    pdf.set_font("Arial", '', 10)
+    texto_legal = (
+        "Por medio de la presente, hago constar que he recibido el siguiente equipo tecnológico para el "
+        "desarrollo de mis funciones y actividades laborales en la empresa Standard Logistics S.A. de C.V.\n\n"
+        "Yo como receptor asumo la responsabilidad y el cuidado de dicho equipo, el cual me comprometo a "
+        "cuidarlo y mantenerlo en buen estado, siendo utilizado únicamente dentro del ámbito laboral. "
+        "No podré hacer uso personal ni abusar de las condiciones del contrato.\n\n"
+        "He recibido el equipo de trabajo que se menciona a continuación:"
+    )
+    pdf.multi_cell(0, 5, texto_legal)
+    pdf.ln(5)
+
+    # Tabla de especificaciones
+    pdf.set_font("Arial", 'B', 9)
+    columnas = [
+        {'titulo': 'EQUIPO', 'ancho': 35},
+        {'titulo': 'MARCA', 'ancho': 35},
+        {'titulo': 'MODELO', 'ancho': 55}, # Más ancho para el modelo
+        {'titulo': 'SERIE', 'ancho': 65}
+    ]
+    
+    # Dibujar encabezados
+    pdf.set_fill_color(230, 230, 230)
+    for col in columnas:
+        pdf.cell(col['ancho'], 7, col['titulo'], 1, 0, 'C', True)
+    pdf.ln(7)
+
+    # Lógica para fila de datos con ajuste automático (MultiCell)
+    pdf.set_font("Arial", '', 8)
+    
+    # Guardamos la posición actual
+    x = pdf.get_x()
+    y = pdf.get_y()
+    
+    # Calculamos la altura necesaria basada en el campo más largo (Modelo o Marca)
+    # 5 es la altura base de una línea de texto
+    lineas_modelo = len(pdf.multi_cell(55, 5, modelo, split_only=True))
+    lineas_marca = len(pdf.multi_cell(35, 5, marca, split_only=True))
+    max_lineas = max(lineas_modelo, lineas_marca, 1)
+    altura_fila = max_lineas * 5 
+
+    # Dibujamos cada celda usando el alto calculado
+    pdf.cell(35, altura_fila, "LAPTOP", 1, 0, 'C')
+    
+    # Celda con posible multilínea para MARCA
+    pos_x = pdf.get_x()
+    pdf.multi_cell(35, 5, marca, 1, 'C')
+    pdf.set_xy(pos_x + 35, y) # Regresamos a la línea para la siguiente celda
+    
+    # Celda con posible multilínea para MODELO
+    pos_x = pdf.get_x()
+    pdf.multi_cell(55, 5, modelo, 1, 'C')
+    pdf.set_xy(pos_x + 55, y)
+    
+    # Celda de SERIE
+    pdf.cell(65, altura_fila, serie, 1, 1, 'C')
+
+    # Sección de DETALLES y COMENTARIOS (También con MultiCell)
+    y_detalles = pdf.get_y()
+    pdf.set_font("Arial", 'B', 9)
+    pdf.cell(100, 7, "DETALLES TECNICOS / ESPECIFICACIONES", 1, 0, 'C', True)
+    pdf.cell(90, 7, "COMENTARIOS ADICIONALES", 1, 1, 'C', True)
+
+    pdf.set_font("Arial", '', 8)
+    # Dibujamos Specs
+    x_temp = pdf.get_x()
+    pdf.multi_cell(100, 5, specs, 1, 'L')
+    y_final_specs = pdf.get_y()
+    
+    # Dibujamos Comentarios al lado
+    pdf.set_xy(x_temp + 100, y_detalles + 7)
+    pdf.multi_cell(90, 5, comentarios_extra, 1, 'L')
+    y_final_comentarios = pdf.get_y()
+    
+    # Ajustamos la posición final al punto más bajo para las firmas
+    pdf.set_y(max(y_final_specs, y_final_comentarios) + 10)
+
+    # Firmas
+    pdf.set_font("Arial", '', 10)
+    pdf.ln(10)
+    pdf.cell(95, 10, "__________________________", 0, 0, 'C')
+    pdf.cell(95, 10, "__________________________", 0, 1, 'C')
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(95, 5, usuario, 0, 0, 'C')
+    pdf.cell(95, 5, "Alfredo Valadez", 0, 1, 'C')
+    pdf.set_font("Arial", '', 9)
+    pdf.cell(95, 5, "Receptor", 0, 0, 'C')
+    pdf.cell(95, 5, "IT", 0, 1, 'C')
+
+    response = make_response(pdf.output(dest='S').encode('latin-1', 'replace'))
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=Responsiva_{usuario}.pdf'
+    return response
+
+@app.route('/generar_responsiva_celular/<int:id>', methods=['POST'])
+@login_required
+def generar_responsiva_celular(id):
+    # 1. Captura de datos
+    usuario = request.form.get('usuario')
+    marca_modelo = request.form.get('marca_modelo')
+    imei = request.form.get('imei')
+    numero = request.form.get('numero')
+    ubicacion = request.form.get('ubicacion', 'N/A')
+    comentarios_extra = request.form.get('comentarios', '')
+    fecha_actual = datetime.now().strftime("%d/%m/%Y")
+
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Fecha arriba a la derecha
+    pdf.set_font("Arial", '', 10)
+    pdf.cell(190, 10, f"Monterrey, N.L. a {fecha_actual}", 0, 1, 'R')
+    
+    # Título Principal [cite: 1]
+    pdf.set_font("Arial", 'B', 14)
+    pdf.cell(190, 10, "RESGUARDO DE EQUIPO TECNOLOGICO", 0, 1, 'C')
+    pdf.ln(5)
+
+    # 2. Texto Legal unificado (Laptop y Celular) 
+    pdf.set_font("Arial", '', 10)
+    texto_legal = (
+        "Por medio de la presente, hago constar que he recibido el siguiente equipo tecnológico para el "
+        "desarrollo de mis funciones y actividades laborales en la empresa Standard Logistics S.A. de C.V.\n\n"
+        "Yo como receptor asumo la responsabilidad y el cuidado de dicho equipo, el cual me comprometo a "
+        "cuidarlo y mantenerlo en buen estado, siendo utilizado únicamente dentro del ámbito laboral. "
+        "No podré hacer uso personal ni abusar de las condiciones del contrato.\n\n"
+        "He recibido el equipo de trabajo que se menciona a continuación:"
+    )
+    pdf.multi_cell(0, 5, texto_legal)
+    pdf.ln(5)
+
+    # 3. Tabla de Datos con celdas separadas y alineación perfecta
+    pdf.set_fill_color(230, 230, 230)
+    pdf.set_font("Arial", 'B', 8)
+    
+    # Encabezados
+    pdf.cell(50, 7, "MARCA / MODELO", 1, 0, 'C', True)
+    pdf.cell(50, 7, "IMEI", 1, 0, 'C', True)
+    pdf.cell(45, 7, "NUMERO", 1, 0, 'C', True)
+    pdf.cell(45, 7, "UBICACION", 1, 1, 'C', True)
+
+    pdf.set_font("Arial", '', 8)
+    
+    # --- LÓGICA ANTI-ESCALÓN ---
+    # Guardamos la posición inicial de la fila
+    x_start = pdf.get_x()
+    y_start = pdf.get_y()
+    
+    # 1. Calculamos la altura necesaria analizando el texto del modelo
+    # Esto simula el texto para saber cuántas líneas ocupará
+    lineas_modelo = len(pdf.multi_cell(50, 5, marca_modelo, split_only=True))
+    altura_fila = max(lineas_modelo * 5, 10) # Mínimo 10mm para que se vea bien
+
+    # 2. Dibujamos primero los rectángulos vacíos (los bordes) para que queden alineados
+    pdf.cell(50, altura_fila, "", 1, 0)
+    pdf.cell(50, altura_fila, "", 1, 0)
+    pdf.cell(45, altura_fila, "", 1, 0)
+    pdf.cell(45, altura_fila, "", 1, 1) 
+
+    # 3. Regresamos el cursor al inicio de la fila para rellenar el texto
+    # Usamos multi_cell para el modelo pero sin bordes (border=0) porque ya los dibujamos
+    pdf.set_xy(x_start, y_start)
+    pdf.multi_cell(50, 5, marca_modelo, 0, 'C')
+
+    # 4. Rellenamos las demás celdas con set_xy exacto
+    # Usamos y_start + (altura_fila/2 - 2) para centrar verticalmente el texto simple
+    valign = y_start + (altura_fila / 2) - 2
+
+    pdf.set_xy(x_start + 50, valign)
+    pdf.cell(50, 0, imei, 0, 0, 'C')
+    
+    pdf.set_xy(x_start + 100, valign)
+    pdf.cell(45, 0, numero, 0, 0, 'C')
+    
+    pdf.set_xy(x_start + 145, valign)
+    pdf.cell(45, 0, ubicacion, 0, 1, 'C')
+
+    # 5. Movemos el cursor al final de la fila para continuar con el documento
+    pdf.set_y(y_start + altura_fila)
+  
+    # 5. Texto de responsabilidad final [cite: 6, 7]
+    pdf.ln(5)
+    pdf.set_font("Arial", '', 9)
+    pdf.multi_cell(0, 5, "En caso de pérdida o robo, correrán a mi cargo los costos de reparación o reposición. "
+                        "Asimismo, aquellos daños que sean causa del mal manejo o imprudencia por mi parte serán "
+                        "responsabilidad mía.")
+
+    # 6. Firmas [cite: 8]
+    pdf.ln(20)
+    pdf.set_font("Arial", '', 10)
+    pdf.cell(95, 10, "__________________________", 0, 0, 'C')
+    pdf.cell(95, 10, "__________________________", 0, 1, 'C')
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(95, 5, usuario, 0, 0, 'C')
+    pdf.cell(95, 5, "Alfredo Valadez", 0, 1, 'C')
+    pdf.set_font("Arial", '', 9)
+    pdf.cell(95, 5, "Receptor", 0, 0, 'C')
+    pdf.cell(95, 5, "IT Department", 0, 1, 'C')
+
+    # Retorno del archivo
+    response = make_response(pdf.output(dest='S').encode('latin-1', 'replace'))
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=Responsiva_Celular_{usuario}.pdf'
+    return response
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
