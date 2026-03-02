@@ -149,6 +149,22 @@ def dashboard():
     cursor.execute("""SELECT COUNT(*) FROM mantenimiento m JOIN inventario e ON m.equipo_id = e.id WHERE m.proxima_fecha < ? AND m.proxima_fecha != '' AND m.proxima_fecha IS NOT NULL""", (hoy,))
     venc = cursor.fetchone()[0]
 
+    # Consulta para agrupar laptops por ubicación
+    cursor.execute("SELECT ubicacion, COUNT(*) FROM inventario GROUP BY ubicacion")
+    loc_laptops = dict(cursor.fetchall())
+
+    # Consulta para agrupar celulares por ubicación
+    cursor.execute("SELECT ubicacion, COUNT(*) FROM celulares GROUP BY ubicacion")
+    loc_celulares = dict(cursor.fetchall())
+
+    # Unificamos todas las ubicaciones únicas encontradas
+    todas_ubicaciones = list(set(list(loc_laptops.keys()) + list(loc_celulares.keys())))
+    
+    # Preparamos las listas para la gráfica
+    labels_loc = [u if u else "Sin Asignar" for u in todas_ubicaciones]
+    data_laptops = [loc_laptops.get(u, 0) for u in todas_ubicaciones]
+    data_celulares = [loc_celulares.get(u, 0) for u in todas_ubicaciones]
+
     cursor.execute("SELECT * FROM incidencias ORDER BY id DESC")
     t_procesados = []
     for t in cursor.fetchall():
@@ -209,8 +225,7 @@ def dashboard():
     conn.close()
     return render_template('toolbox.html', resumen={'equipos': total_eq, 'pendientes': pend, 'vencidos': venc},
                            tickets=t_procesados, equipos=equipos, celulares=celulares, gastos_por_mes=gastos_ordenados, labels_gastos=labels_gastos, data_gastos=data_gastos, claves=claves, mantenimientos=manto, 
-                           notas=notas, prestamos=prestamos, wiki=wiki, fecha_actual=hoy, 
-                           stats_tickets=stats_tickets, stats_manto=stats_manto, pendientes_count=pend)
+                           notas=notas, prestamos=prestamos, wiki=wiki, fecha_actual=hoy, stats_tickets=stats_tickets, stats_manto=stats_manto, pendientes_count=pend, labels_loc=labels_loc, data_laptops=data_laptops, data_celulares=data_celulares)
 
 # --- LOGIN ACTUALIZADO ---
 @app.route('/login', methods=['GET', 'POST'])
@@ -358,28 +373,35 @@ def backup_db(): return send_file(os.path.join(BASE_DIR, 'soporte.db'), as_attac
 def descargar_reporte_excel():
     conn = conectar_db()
     
-    # Consultas simplificadas para evitar errores de nombres de columnas
+    # 1. Consultas base
     df_tickets = pd.read_sql_query("SELECT id as Folio, equipo as Equipo, usuario as Usuario, problema as Falla, fecha as Fecha FROM incidencias", conn)
+    df_inv = pd.read_sql_query("SELECT nombre_equipo, usuario, marca, modelo, n_serie, ubicacion, especificaciones FROM inventario", conn)
+    df_cel = pd.read_sql_query("SELECT usuario, marca_modelo, imei, numero_tel, ubicacion FROM celulares", conn)
+    df_gastos = pd.read_sql_query("SELECT fecha, proveedor, categoria, descripcion, cantidad, precio_unitario, (cantidad * precio_unitario) as Total FROM gastos", conn)
     
-    # En Inventario usamos '*' para traer todo y evitar el error 'no such column'
-    df_inv = pd.read_sql_query("SELECT * FROM inventario", conn)
+    # --- 2. LÓGICA DE LA QUINTA HOJA (RESUMEN EJECUTIVO) ---
+    # Conteos por ubicación
+    resumen_loc = df_inv.groupby('ubicacion').size().reset_index(name='Cant_Laptops')
+    resumen_cel = df_cel.groupby('ubicacion').size().reset_index(name='Cant_Celulares')
     
-    df_cel = pd.read_sql_query("SELECT * FROM celulares", conn)
+    # Unir ambos conteos en una sola tabla de resumen
+    df_resumen = pd.merge(resumen_loc, resumen_cel, on='ubicacion', how='outer').fillna(0)
     
-    # Para gastos, calculamos el total directamente
-    df_gastos = pd.read_sql_query("SELECT fecha as Fecha, proveedor as Proveedor, categoria as Categoria, descripcion as Articulo, cantidad as Cant, precio_unitario as Unitario, (cantidad * precio_unitario) as Total FROM gastos", conn)
+    # Añadir métricas rápidas
+    metricas = pd.DataFrame({
+        'Concepto': ['Total Equipos Laptop/PC', 'Total Celulares', 'Tickets Pendientes', 'Inversion Total Gastos'],
+        'Valor': [len(df_inv), len(df_cel), len(df_tickets), df_gastos['Total'].sum()]
+    })
     
     conn.close()
 
-    # Añadir fila de TOTAL al final de Gastos
-    if not df_gastos.empty:
-        total_suma = df_gastos['Total'].sum()
-        fila_total = pd.DataFrame([['', '', '', 'TOTAL GENERAL:', '', '', total_suma]], columns=df_gastos.columns)
-        df_gastos = pd.concat([df_gastos, fila_total], ignore_index=True)
-
     f = "Reporte_TI_Master.xlsx"
-    
     with pd.ExcelWriter(f, engine='openpyxl') as writer:
+        # Pestaña Nueva (La ponemos primero para que sea lo primero que vean)
+        df_resumen.to_excel(writer, index=False, sheet_name='Resumen_Ubicaciones')
+        metricas.to_excel(writer, index=False, sheet_name='Metricas_Generales', startrow=len(df_resumen) + 3)
+        
+        # Pestañas existentes
         df_tickets.to_excel(writer, index=False, sheet_name='Tickets')
         df_inv.to_excel(writer, index=False, sheet_name='Inventario_Hardware')
         df_cel.to_excel(writer, index=False, sheet_name='Inventario_Celulares')
@@ -392,8 +414,7 @@ def descargar_reporte_excel():
                 max_length = 0
                 column = col[0].column_letter
                 for cell in col:
-                    if cell.value:
-                        max_length = max(max_length, len(str(cell.value)))
+                    if cell.value: max_length = max(max_length, len(str(cell.value)))
                 worksheet.column_dimensions[column].width = max_length + 2
 
     return send_file(f, as_attachment=True)
