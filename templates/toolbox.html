@@ -510,16 +510,16 @@
     </div>
 
         <div class="col-md-12 mt-4">
-            <div class="card card-custom p-4 shadow-sm border-0">
-                 <h6 class="fw-bold text-muted text-center mb-3">DISTRIBUCIÓN DE ACTIVOS POR UBICACIÓN</h6>
-                 <div style="position: relative; height:300px;">
-                 <canvas id="chartUbicaciones" 
-                         data-labels='{{ labels_loc | tojson }}'
-                         data-laptops='{{ data_laptops | tojson }}'
-                         data-celulares='{{ data_celulares | tojson }}'>
-                 </canvas>
-            </div>
+    <div class="card card-custom p-4 shadow-sm border-0">
+        <h6 class="fw-bold text-muted text-center mb-3">DISTRIBUCIÓN DE ACTIVOS POR UBICACIÓN</h6>
+        <div style="position: relative; height:300px;">
+            <canvas id="chartUbicaciones" 
+                    data-labels='{{ labels_loc | tojson }}'
+                    data-laptops='{{ data_laptops | tojson }}'
+                    data-celulares='{{ data_celulares | tojson }}'>
+            </canvas>
         </div>
+    </div> 
 </div>
 
 <div class="modal fade" id="modalAddTicket" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form action="/crear_incidencia_manual" method="POST" class="modal-content"><div class="modal-header bg-primary text-white"><h5>Nuevo Reporte</h5></div><div class="modal-body p-4"><label class="small fw-bold">USUARIO:</label><input type="text" name="usuario" class="form-control mb-3" required><label class="small fw-bold">EQUIPO:</label><select name="equipo_nombre" class="form-select mb-3">{% for e in equipos %}<option value="{{e.nombre_equipo}}">{{e.nombre_equipo}}</option>{% endfor %}<option value="OTRO">OTRO</option></select><label class="small fw-bold">FALLA:</label><textarea name="problema" class="form-control" required></textarea></div><div class="modal-footer"><button type="submit" class="btn btn-primary w-100 rounded-pill">Crear</button></div></form></div></div>
