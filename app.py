@@ -219,14 +219,31 @@ def dashboard():
     labels_gastos = [row[0] for row in gastos_grafica_raw] if gastos_grafica_raw else []
     data_gastos = [row[1] for row in gastos_grafica_raw] if gastos_grafica_raw else []
 
-        # RECUERDA: Añade 'gastos_por_mes=gastos_por_mes' al render_template de esta función 
-    cursor.execute("SELECT COUNT(*) FROM incidencias WHERE solucion = 'Solucionado'"); sol = cursor.fetchone()[0]
-    stats_tickets = [sol, pend]; stats_manto = [len(manto)]
-    conn.close()
-    return render_template('toolbox.html', resumen={'equipos': total_eq, 'pendientes': pend, 'vencidos': venc},
-                           tickets=t_procesados, equipos=equipos, celulares=celulares, gastos_por_mes=gastos_ordenados, labels_gastos=labels_gastos, data_gastos=data_gastos, claves=claves, mantenimientos=manto, 
-                           notas=notas, prestamos=prestamos, wiki=wiki, fecha_actual=hoy, stats_tickets=stats_tickets, stats_manto=stats_manto, pendientes_count=pend, labels_loc=labels_loc, data_laptops=data_laptops, data_celulares=data_celulares)
+   # 1. CONSULTAR EL HISTORIAL (Debe estar antes de conn.close())
+    cursor.execute("SELECT * FROM historial_asignaciones ORDER BY fecha_cambio DESC")
+    historial_raw = cursor.fetchall()
+    historial = [dict(row) for row in historial_raw] 
 
+    # 2. CONTEOS PARA GRÁFICAS (Debe estar antes de conn.close())
+    cursor.execute("SELECT COUNT(*) FROM incidencias WHERE solucion = 'Solucionado'")
+    sol = cursor.fetchone()[0]
+    stats_tickets = [sol, pend]
+    stats_manto = [len(manto)]
+
+    # 3. AHORA SÍ, CERRAR LA CONEXIÓN
+    conn.close() 
+
+    # 4. RETORNAR EL TEMPLATE
+    return render_template('toolbox.html', 
+                           resumen={'equipos': total_eq, 'pendientes': pend, 'vencidos': venc},
+                           tickets=t_procesados, equipos=equipos, celulares=celulares, 
+                           gastos_por_mes=gastos_ordenados, labels_gastos=labels_gastos, 
+                           data_gastos=data_gastos, claves=claves, mantenimientos=manto, 
+                           notas=notas, prestamos=prestamos, wiki=wiki, fecha_actual=hoy, 
+                           stats_tickets=stats_tickets, stats_manto=stats_manto, 
+                           pendientes_count=pend, labels_loc=labels_loc, 
+                           data_laptops=data_laptops, data_celulares=data_celulares, 
+                           historial=historial)
 # --- LOGIN ACTUALIZADO ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -259,7 +276,31 @@ def eliminar_ticket(id):
 @app.route('/actualizar_equipo/<int:id>', methods=['POST'])
 @login_required
 def actualizar_equipo(id):
-    conn = conectar_db(); conn.execute("""UPDATE inventario SET nombre_equipo=?, usuario=?, n_serie=?, marca=?, modelo=?, ubicacion=?, fecha_asignacion=?, ip_address=?, tipo_red=?, especificaciones=? WHERE id=?""", (request.form['nombre'], request.form['usuario'], request.form['serie'], request.form['marca'], request.form['modelo'], request.form['ubicacion'], request.form['fecha_asig'], request.form['ip'], request.form['red'], request.form['specs'], id)); conn.commit(); conn.close(); return redirect('/#inventario')
+    nuevo_usuario = request.form['usuario'] # Definimos la variable
+    conn = conectar_db(); cursor = conn.cursor()
+    
+    # 1. Obtener usuario anterior
+    cursor.execute("SELECT usuario FROM inventario WHERE id=?", (id,))
+    fila = cursor.fetchone()
+    usuario_anterior = fila[0] if fila else "N/A"
+
+    # 2. Registrar si hay cambio
+    if usuario_anterior != nuevo_usuario:
+        cursor.execute("""INSERT INTO historial_asignaciones 
+            (tipo_activo, id_activo, usuario_anterior, usuario_nuevo, detalles) 
+            VALUES (?, ?, ?, ?, ?)""", 
+            ('Laptop', id, usuario_anterior, nuevo_usuario, 'Cambio de usuario en Inventario'))
+
+    # 3. Realizar el UPDATE
+    cursor.execute("""UPDATE inventario SET nombre_equipo=?, usuario=?, n_serie=?, marca=?, 
+                      modelo=?, ubicacion=?, fecha_asignacion=?, ip_address=?, tipo_red=?, 
+                      especificaciones=? WHERE id=?""", 
+                   (request.form['nombre'], nuevo_usuario, request.form['serie'], request.form['marca'], 
+                    request.form['modelo'], request.form['ubicacion'], request.form['fecha_asig'], 
+                    request.form['ip'], request.form['red'], request.form['specs'], id))
+    
+    conn.commit(); conn.close()
+    return redirect('/#inventario')
 
 @app.route('/eliminar_equipo/<int:id>')
 @login_required
@@ -420,42 +461,71 @@ def descargar_reporte_excel():
     return send_file(f, as_attachment=True)
 
 @app.route('/agregar_celular', methods=['POST'])
-@login_required
 def agregar_celular():
-    usuario = request.form.get('usuario')
+    # 1. Recibimos los 7 campos exactamente como se llaman en el HTML
+    usuario = request.form.get('usuario') or 'STOCK'
     marca_modelo = request.form.get('marca_modelo')
-    imei = request.form.get('imei')
     numero_tel = request.form.get('numero_tel')
+    imei = request.form.get('imei')
     fecha_asig = request.form.get('fecha_asig')
-    comentarios = request.form.get('comentarios')
     ubicacion = request.form.get('ubicacion')
+    comentarios = request.form.get('comentarios')
 
-    conn = conectar_db(); cursor = conn.cursor()
-    cursor.execute("""INSERT INTO celulares 
-                   (usuario, marca_modelo, imei, numero_tel, fecha_asignacion, ubicacion, comentarios) 
-                   VALUES (?, ?, ?, ?, ?, ?)""", 
-                   (usuario, marca_modelo, imei, numero_tel, fecha_asig, comentarios))
-    conn.commit(); conn.close()
+    conn = conectar_db()
+    cursor = conn.cursor()
+    
+    # 2. Insertamos los 7 valores con 7 signos de interrogación (?, ?, ?, ?, ?, ?, ?)
+    cursor.execute("""
+        INSERT INTO celulares 
+        (usuario, marca_modelo, numero_tel, imei, fecha_asignacion, ubicacion, comentarios) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (usuario, marca_modelo, numero_tel, imei, fecha_asig, ubicacion, comentarios))
+    
+    # 3. Opcional pero recomendado: Registrar en el historial que se ingresó un equipo nuevo
+    id_nuevo = cursor.lastrowid
+    cursor.execute("""
+        INSERT INTO historial_asignaciones 
+        (tipo_activo, id_activo, usuario_anterior, usuario_nuevo, detalles) 
+        VALUES (?, ?, ?, ?, ?)
+    """, ('Celular', id_nuevo, 'NUEVO INGRESO', usuario, 'Alta de equipo móvil en sistema'))
+
+    conn.commit()
+    conn.close()
+    
+    # Retornamos a la pestaña de celulares
     return redirect(url_for('dashboard', tab='celulares'))
 
 @app.route('/actualizar_celular/<int:id>', methods=['POST'])
 @login_required
 def actualizar_celular(id):
-    # Asegúrate de usar los 'name' que pusiste en los inputs del HTML
-    usuario = request.form.get('usuario')
+    nuevo_usuario = request.form.get('usuario')
     marca_modelo = request.form.get('marca_modelo')
     imei = request.form.get('imei')
     numero_tel = request.form.get('numero_tel')
-    fecha_asignacion = request.form.get('fecha_asig') # Este viene del input name="fecha_asig"
+    fecha_asignacion = request.form.get('fecha_asig')
     ubicacion = request.form.get('ubicacion')
     comentarios = request.form.get('comentarios')
     
-
     conn = conectar_db(); cursor = conn.cursor()
+    
+    # 1. Consultar el antiguo dueño
+    cursor.execute("SELECT usuario FROM celulares WHERE id=?", (id,))
+    res = cursor.fetchone()
+    antiguo = res[0] if res else "Desconocido"
+
+    # 2. Registrar historial si hay cambio
+    if antiguo != nuevo_usuario:
+        cursor.execute("""INSERT INTO historial_asignaciones 
+            (tipo_activo, id_activo, usuario_anterior, usuario_nuevo, detalles) 
+            VALUES (?, ?, ?, ?, ?)""", 
+            ('Celular', id, antiguo, nuevo_usuario, 'Cambio de equipo móvil'))
+
+    # 3. Actualizar datos del celular
     cursor.execute("""UPDATE celulares SET 
-                   usuario=?, marca_modelo=?, imei=?, numero_tel=?, fecha_asignacion=?, ubicacion=?, comentarios=? 
-                   WHERE id=?""", 
-                   (usuario, marca_modelo, imei, numero_tel, fecha_asignacion, ubicacion, comentarios, id))
+                    usuario=?, marca_modelo=?, imei=?, numero_tel=?, fecha_asignacion=?, ubicacion=?, comentarios=? 
+                    WHERE id=?""", 
+                    (nuevo_usuario, marca_modelo, imei, numero_tel, fecha_asignacion, ubicacion, comentarios, id))
+    
     conn.commit(); conn.close()
     return redirect(url_for('dashboard', tab='celulares'))
 
