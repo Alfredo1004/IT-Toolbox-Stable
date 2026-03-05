@@ -8,6 +8,7 @@ from flask import make_response
 from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import pytz
 from datetime import datetime
 
@@ -17,23 +18,29 @@ zona_mx = pytz.timezone('America/Monterrey')
 # Configuración de servidor (Gmail ejemplo)
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-EMAIL_USER = "tu_correo@gmail.com"
-EMAIL_PASS = "tu_contraseña_de_aplicación" # No es tu clave normal, es la de "App Passwords" de Google
+EMAIL_USER = "soporte@strd.com.mx"
+EMAIL_PASS = "votzjkyrdotybcsk"  # Tu contraseña de aplicación de 16 letras
 
-def enviar_alerta_email(destinatario, asunto, cuerpo):
+def enviar_notificacion(destinatarios, asunto, cuerpo):
     try:
-        msg = MIMEText(cuerpo)
+        msg = MIMEMultipart()
+        msg['From'] = EMAIL_USER # Antes decía EMAIL_REMITENTE
+        msg['To'] = ", ".join(destinatarios)
         msg['Subject'] = asunto
-        msg['From'] = EMAIL_USER
-        msg['To'] = destinatario
-        
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+
+        msg.attach(MIMEText(cuerpo, 'plain'))
+
+        server = smtplib.SMTP(SMTP_SERVER, 587) # Usamos la variable SMTP_SERVER
         server.starttls()
-        server.login(EMAIL_USER, EMAIL_PASS)
-        server.sendmail(EMAIL_USER, destinatario, msg.as_string())
+        
+        # Usamos EMAIL_USER y EMAIL_PASS que definiste arriba
+        server.login(EMAIL_USER, EMAIL_PASS.replace(" ", ""))
+        server.sendmail(EMAIL_USER, destinatarios, msg.as_string())
         server.quit()
+        print(f"✅ Notificación enviada a: {destinatarios}")
     except Exception as e:
-        print(f"Error enviando correo: {e}")
+        # Esto te ayudará a ver el error real en los logs de PythonAnywhere si falla algo más
+        print(f"⚠️ Error al enviar correo: {str(e)}")
 
 app = Flask(__name__)
 app.secret_key = 'it_toolbox_secure_key_2025'
@@ -105,6 +112,15 @@ def dashboard():
     cursor.execute("SELECT COUNT(*) FROM incidencias WHERE solucion = 'Pendiente'"); pend = cursor.fetchone()[0]
     cursor.execute("""SELECT COUNT(*) FROM mantenimiento m JOIN inventario e ON m.equipo_id = e.id WHERE m.proxima_fecha < ? AND m.proxima_fecha != '' AND m.proxima_fecha IS NOT NULL""", (hoy,))
     venc = cursor.fetchone()[0]
+    
+    # --- NUEVAS CONSULTAS DE STOCK ---
+    # Contar Laptops en Stock (que el usuario sea 'STOCK' o 'DISPONIBLE')
+    cursor.execute("SELECT COUNT(*) FROM inventario WHERE usuario LIKE '%STOCK%' OR usuario LIKE '%DISPONIBLE%'")
+    stock_laptops = cursor.fetchone()[0]
+
+    # Contar Celulares en Stock
+    cursor.execute("SELECT COUNT(*) FROM celulares WHERE usuario LIKE '%STOCK%' OR usuario LIKE '%DISPONIBLE%'")
+    stock_celulares = cursor.fetchone()[0]
 
     # Consulta para agrupar laptops por ubicación
     cursor.execute("SELECT ubicacion, COUNT(*) FROM inventario GROUP BY ubicacion")
@@ -200,7 +216,8 @@ def dashboard():
                            stats_tickets=stats_tickets, stats_manto=stats_manto, 
                            pendientes_count=pend, labels_loc=labels_loc, 
                            data_laptops=data_laptops, data_celulares=data_celulares, 
-                           historial=historial)
+                           historial=historial, stock_laptops=stock_laptops, 
+                           stock_celulares=stock_celulares,)
 # --- LOGIN ACTUALIZADO ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -223,14 +240,15 @@ def logout(): session.clear(); return redirect(url_for('login'))
 @app.route('/actualizar_ticket/<int:id>', methods=['POST'])
 def actualizar_ticket(id):
     estado = request.form.get('estado')
-    falla_manual = request.form.get('falla_humana') # Esta es la variable que recibes del formulario
+    falla_manual = request.form.get('falla_humana')
     solucion = request.form.get('comentario')
-    ahora = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d %H:%M:%S")
     
+    zona_mx = pytz.timezone('America/Monterrey')
+    ahora = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d %H:%M:%S")
+
     conn = conectar_db()
     cursor = conn.cursor()
     
-    # 1. Actualizamos los 3 campos clave
     cursor.execute("""
         UPDATE incidencias 
         SET solucion=?, falla_humana=?, comentarios=? 
@@ -238,34 +256,46 @@ def actualizar_ticket(id):
     """, (estado, falla_manual, solucion, id))
     conn.commit()
 
-    # 2. OBTENEMOS LOS DATOS PARA EL CORREO (Esto soluciona el error de la variable 't')
     cursor.execute("SELECT usuario, equipo FROM incidencias WHERE id=?", (id,))
     t = cursor.fetchone()
-    
     conn.close()
 
-    # Redactar notificación
-    asunto = f"Actualización de Ticket Folio #{id} - Estado: {estado}"
-    cuerpo = f"""
-    Hola, se ha actualizado el estado de tu ticket técnico.
+    # ==========================================
+    # PREPARAR Y ENVIAR EL CORREO
+    # ==========================================
+    nombre_usuario = t[0]
+    equipo_usuario = t[1]
     
-    DETALLES DEL REPORTE:
-    ---------------------------------
-    Folio: #{id}
-    Fecha/Hora: {ahora}
-    Usuario: {t[0]}
-    Equipo: {t[1]}
-    Estado Actual: {estado}
-    Diagnóstico TI: {falla_manual}
-    Solución: {solucion}
-    ---------------------------------
-    Este es un mensaje automático de IT TOOLBOX PRO.
-    """
+    asunto = f"Actualización de Ticket #{id} - {equipo_usuario} [{estado}]"
     
-    # Enviar al gerente (puedes poner el correo fijo) y podrías enviarlo al usuario
-    enviar_alerta_email("correo_gerente@empresa.com", asunto, cuerpo)
+    cuerpo = f"""Hola {nombre_usuario},
+
+El departamento de TI ha actualizado el estado de tu reporte técnico.
+
+DETALLES DEL TICKET:
+--------------------------------------------------
+Folio: #{id}
+Fecha de actualización: {ahora}
+Equipo: {equipo_usuario}
+
+ESTADO ACTUAL: {estado}
+DIAGNÓSTICO TÉCNICO: {falla_manual}
+SOLUCIÓN / NOTAS: {solucion}
+--------------------------------------------------
+
+Este es un mensaje generado automáticamente por IT TOOLBOX PRO. 
+Por favor no respondas a este correo.
+"""
+
+    # === CORREOS DE PRUEBA ===
+    correo_gerente = "tu_correo_real@tuempresa.com"  # <-- PON TU CORREO DE GERENTE
+    correo_usuario = "otro_correo_prueba@gmail.com"  # <-- PON UN CORREO SECUNDARIO TUYO
     
-    # Aquí es donde el Dashboard se refresca con los nuevos estados
+    lista_destinatarios = [correo_gerente, correo_usuario]
+    
+    # Disparamos la función
+    enviar_notificacion(lista_destinatarios, asunto, cuerpo)
+
     return redirect(url_for('dashboard'))
 
 @app.route('/eliminar_ticket/<int:id>')

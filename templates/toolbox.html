@@ -188,11 +188,67 @@
         </div>
     </div>
 
-    <div class="row mb-5" id="dashboard-summary">
-        <div class="col-md-4"><div class="card card-custom p-4 card-stat shadow-sm border-start border-primary border-5"><h6>Equipos</h6><h3 class="fw-bold mb-0">{{ resumen.equipos }}</h3></div></div>
-        <div class="col-md-4"><div class="card card-custom p-4 card-stat shadow-sm border-start border-warning border-5"><h6>Pendientes</h6><h3 id="stat-pendientes-dashboard" class="fw-bold mb-0 text-warning">{{ resumen.pendientes }}</h3></div></div>
-        <div class="col-md-4"><div class="card card-custom p-4 card-stat shadow-sm border-start border-danger border-5"><h6>Vencidos / Hoy</h6><h3 id="stat-vencidos" class="fw-bold mb-0 text-danger">{{ resumen.vencidos }}</h3></div></div>
+    <div class="row g-3 mb-5" id="dashboard-summary">
+    <div class="col-md">
+        <div class="card card-custom p-3 shadow-sm border-start border-primary border-5 h-100">
+            <div class="d-flex align-items-center">
+                <div>
+                    <h6 class="text-muted small text-uppercase fw-bold">Total Laptops</h6>
+                    <h3 class="fw-bold mb-0">{{ resumen.equipos }}</h3>
+                </div>
+                <i class="fas fa-laptop ms-auto fa-2x text-primary opacity-25"></i>
+            </div>
+        </div>
     </div>
+
+    <div class="col-md">
+        <div class="card card-custom p-3 shadow-sm border-start border-success border-5 h-100">
+            <div class="d-flex align-items-center">
+                <div>
+                    <h6 class="text-muted small text-uppercase fw-bold">Laptops Stock</h6>
+                    <h3 class="fw-bold mb-0 text-success">{{ stock_laptops }}</h3>
+                </div>
+                <i class="fas fa-boxes ms-auto fa-2x text-success opacity-25"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md">
+        <div class="card card-custom p-3 shadow-sm border-start border-info border-5 h-100">
+            <div class="d-flex align-items-center">
+                <div>
+                    <h6 class="text-muted small text-uppercase fw-bold">Cels Stock</h6>
+                    <h3 class="fw-bold mb-0 text-info">{{ stock_celulares }}</h3>
+                </div>
+                <i class="fas fa-mobile-alt ms-auto fa-2x text-info opacity-25"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md">
+        <div class="card card-custom p-3 shadow-sm border-start border-warning border-5 h-100">
+            <div class="d-flex align-items-center">
+                <div>
+                    <h6 class="text-muted small text-uppercase fw-bold">Pendientes</h6>
+                    <h3 id="stat-pendientes-dashboard" class="fw-bold mb-0 text-warning">{{ resumen.pendientes }}</h3>
+                </div>
+                <i class="fas fa-ticket-alt ms-auto fa-2x text-warning opacity-25"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md">
+        <div class="card card-custom p-3 shadow-sm border-start border-danger border-5 h-100">
+            <div class="d-flex align-items-center">
+                <div>
+                    <h6 class="text-muted small text-uppercase fw-bold">Vencidos/Hoy</h6>
+                    <h3 id="stat-vencidos" class="fw-bold mb-0 text-danger">{{ resumen.vencidos }}</h3>
+                </div>
+                <i class="fas fa-tools ms-auto fa-2x text-danger opacity-25"></i>
+            </div>
+        </div>
+    </div>
+</div>
 
     <div class="tab-content">
         <div class="tab-pane fade show active" id="tickets">
