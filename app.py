@@ -6,6 +6,30 @@ from datetime import datetime
 from fpdf import FPDF
 from flask import make_response
 from datetime import datetime
+import smtplib
+from email.mime.text import MIMEText
+from datetime import datetime
+
+# Configuración de servidor (Gmail ejemplo)
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+EMAIL_USER = "tu_correo@gmail.com"
+EMAIL_PASS = "tu_contraseña_de_aplicación" # No es tu clave normal, es la de "App Passwords" de Google
+
+def enviar_alerta_email(destinatario, asunto, cuerpo):
+    try:
+        msg = MIMEText(cuerpo)
+        msg['Subject'] = asunto
+        msg['From'] = EMAIL_USER
+        msg['To'] = destinatario
+        
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.sendmail(EMAIL_USER, destinatario, msg.as_string())
+        server.quit()
+    except Exception as e:
+        print(f"Error enviando correo: {e}")
 
 app = Flask(__name__)
 app.secret_key = 'it_toolbox_secure_key_2025'
@@ -33,9 +57,9 @@ def login_required(f):
 @app.route('/reporte_agente', methods=['POST'])
 def reporte_agente():
     data = request.json
-    hostname = data.get('equipo')
+    ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # Genera la estampa de tiempo
     
-    # Creamos el diagnóstico técnico (lo que irá a "Diagnóstico Agente")
+    # Preparamos el diagnóstico técnico
     diagnostico_tecnico = f"RAM: {data.get('ram_uso')} | {data.get('disco_libre')}"
     
     # Lógica de Software Prohibido
@@ -49,12 +73,12 @@ def reporte_agente():
     conn = conectar_db()
     cursor = conn.cursor()
     
-    # Paso importante: Insertamos en 'problema' (Diagnóstico Agente) 
-    # y dejamos 'falla_humana' como '-' para que se llene manual después.
+    # Insertamos los 6 campos correspondientes (agregando fecha_registro)
     cursor.execute("""
-        INSERT INTO incidencias (usuario, equipo, problema, solucion, falla_humana)
-        VALUES (?, ?, ?, ?, ?)
-    """, (data.get('usuario'), hostname, diagnostico_tecnico, 'Pendiente', '-'))
+        INSERT INTO incidencias 
+        (usuario, equipo, problema, solucion, falla_humana, fecha_registro)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (data.get('usuario'), data.get('equipo'), diagnostico_tecnico, 'Pendiente', '-', ahora))
     
     conn.commit()
     conn.close()
@@ -195,21 +219,47 @@ def logout(): session.clear(); return redirect(url_for('login'))
 @app.route('/actualizar_ticket/<int:id>', methods=['POST'])
 def actualizar_ticket(id):
     estado = request.form.get('estado')
-    falla_manual = request.form.get('falla_humana')
+    falla_manual = request.form.get('falla_humana') # Esta es la variable que recibes del formulario
     solucion = request.form.get('comentario')
+    ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     conn = conectar_db()
     cursor = conn.cursor()
     
-    # Actualizamos los 3 campos clave
+    # 1. Actualizamos los 3 campos clave
     cursor.execute("""
         UPDATE incidencias 
         SET solucion=?, falla_humana=?, comentarios=? 
         WHERE id=?
     """, (estado, falla_manual, solucion, id))
-    
     conn.commit()
+
+    # 2. OBTENEMOS LOS DATOS PARA EL CORREO (Esto soluciona el error de la variable 't')
+    cursor.execute("SELECT usuario, equipo FROM incidencias WHERE id=?", (id,))
+    t = cursor.fetchone()
+    
     conn.close()
+
+    # Redactar notificación
+    asunto = f"Actualización de Ticket Folio #{id} - Estado: {estado}"
+    cuerpo = f"""
+    Hola, se ha actualizado el estado de tu ticket técnico.
+    
+    DETALLES DEL REPORTE:
+    ---------------------------------
+    Folio: #{id}
+    Fecha/Hora: {ahora}
+    Usuario: {t[0]}
+    Equipo: {t[1]}
+    Estado Actual: {estado}
+    Diagnóstico TI: {falla_manual}
+    Solución: {solucion}
+    ---------------------------------
+    Este es un mensaje automático de IT TOOLBOX PRO.
+    """
+    
+    # Enviar al gerente (puedes poner el correo fijo) y podrías enviarlo al usuario
+    enviar_alerta_email("correo_gerente@empresa.com", asunto, cuerpo)
     
     # Aquí es donde el Dashboard se refresca con los nuevos estados
     return redirect(url_for('dashboard'))

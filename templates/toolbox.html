@@ -207,24 +207,31 @@
         </div>
     </div>
     <div class="card card-custom overflow-hidden">
-        <table class="table align-middle m-0" id="tableTickets">
-            <thead class="table-light">
-                <tr>
-                    <th>Folio</th>
-                    <th>Usuario</th>
-                    <th>Equipo</th>
-                    <th>Diagnóstico Agente</th> <th>Falla (Manual)</th>      <th>Solución</th>
-                    <th>Estado</th>
-                    <th class="text-end">Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for t in tickets %}
-                <tr class="{% if '🚨' in t.problema %}borde-prohibido{% else %}borde-normal{% endif %}">
+    <table class="table align-middle m-0" id="tableTickets">
+        <thead class="table-light">
+            <tr>
+                <th class="ps-3">Folio</th>
+                <th>Fecha/Hora</th>
+                <th>Usuario</th>
+                <th>Equipo</th>
+                <th>Diagnóstico Agente</th>
+                <th>Falla (Manual)</th>
+                <th>Solución</th>
+                <th>Estado</th>
+                <th class="text-end pe-3">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in tickets %}
+            <tr class="{% if '🚨' in t.problema %}borde-prohibido{% else %}borde-normal{% endif %}">
                 <td class="fw-bold ps-3">#{{ loop.revindex }}</td>
+                
+                <td><small class="text-muted">{{ t.fecha_registro or '-' }}</small></td>
+                
                 <td>{{ t.usuario }}</td>
+                
                 <td><span class="badge bg-light text-dark border">💻 {{ t.equipo }}</span></td>
-        
+                
                 <td>
                     {% if '🚨' in t.problema %}
                         <span class="text-danger fw-bold small"><i class="fas fa-shield-alt"></i> {{ t.problema }}</span>
@@ -236,26 +243,27 @@
                 <td class="fw-bold text-primary" style="font-size: 0.85rem;">{{ t.falla_humana or '-' }}</td>
 
                 <td><small class="text-muted">{{ t.comentarios or '-' }}</small></td>
-        
+                
                 <td>
                     <span class="badge 
                         {% if t.solucion == 'Solucionado' %} bg-success 
                         {% elif t.solucion == 'En curso' %} bg-info text-dark 
                         {% else %} bg-warning text-dark {% endif %}">
                         {{ t.solucion }}
-            </span>
-        </td>
-                    <td class="text-end pe-3">
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEdit{{t.id}}"><i class="fas fa-cog"></i></button>
-                            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalDel{{t.id}}"><i class="fas fa-trash"></i></button>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+                    </span>
+                </td>
+
+                <td class="text-end pe-3">
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEdit{{t.id}}"><i class="fas fa-cog"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalDel{{t.id}}"><i class="fas fa-trash"></i></button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
               {% for t in tickets %}
     <div class="modal fade" id="modalEdit{{t.id}}" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
