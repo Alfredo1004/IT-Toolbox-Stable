@@ -8,7 +8,11 @@ from flask import make_response
 from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
+import pytz
 from datetime import datetime
+
+# Configura la zona horaria de México
+zona_mx = pytz.timezone('America/Monterrey')
 
 # Configuración de servidor (Gmail ejemplo)
 SMTP_SERVER = "smtp.gmail.com"
@@ -57,7 +61,7 @@ def login_required(f):
 @app.route('/reporte_agente', methods=['POST'])
 def reporte_agente():
     data = request.json
-    ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # Genera la estampa de tiempo
+    ahora = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d %H:%M:%S") # Genera la estampa de tiempo
     
     # Preparamos el diagnóstico técnico
     diagnostico_tecnico = f"RAM: {data.get('ram_uso')} | {data.get('disco_libre')}"
@@ -221,7 +225,7 @@ def actualizar_ticket(id):
     estado = request.form.get('estado')
     falla_manual = request.form.get('falla_humana') # Esta es la variable que recibes del formulario
     solucion = request.form.get('comentario')
-    ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ahora = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d %H:%M:%S")
     
     conn = conectar_db()
     cursor = conn.cursor()
