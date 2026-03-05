@@ -209,27 +209,42 @@
     <div class="card card-custom overflow-hidden">
         <table class="table align-middle m-0" id="tableTickets">
             <thead class="table-light">
-                <tr><th>Folio</th><th>Usuario</th><th>Equipo</th><th>Falla</th><th>Solución</th><th>Estado</th><th class="text-end">Acciones</th></tr>
+                <tr>
+                    <th>Folio</th>
+                    <th>Usuario</th>
+                    <th>Equipo</th>
+                    <th>Diagnóstico Agente</th> <th>Falla (Manual)</th>      <th>Solución</th>
+                    <th>Estado</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
             </thead>
             <tbody>
                 {% for t in tickets %}
-                <tr class="{% if t.solucion == 'Prohibido' %}borde-prohibido{% else %}borde-normal{% endif %}">
-                    <td class="fw-bold ps-3">#{{ loop.revindex }}</td>
-                    <td>{{ t.usuario }}</td>
-                    <td><span class="badge bg-light text-dark border">💻 {{ t.equipo }}</span></td>
-                    <td>
-                        {% if '🚨 HW:' in t.problema %}
-                            <span class="text-danger fw-bold" style="font-size: 0.85rem;">{{ t.problema }}</span>
-                        {% else %}
-                            <small class="text-muted">{{ t.problema }}</small>
-                        {% endif %}
-                    </td>
-                    <td><small class="text-primary fw-bold">{{ t.comentarios or '-' }}</small></td>
-                    <td>
-                        <span class="badge {% if t.solucion == 'Solucionado' %} bg-success {% elif t.solucion == 'Prohibido' %} bg-danger shadow-sm {% else %} bg-warning text-dark {% endif %}">
-                            {% if t.solucion == 'Prohibido' %}<i class="fas fa-exclamation-triangle me-1"></i> Prohibido{% else %}{{ t.solucion }}{% endif %}
-                        </span>
-                    </td>
+                <tr class="{% if '🚨' in t.problema %}borde-prohibido{% else %}borde-normal{% endif %}">
+                <td class="fw-bold ps-3">#{{ loop.revindex }}</td>
+                <td>{{ t.usuario }}</td>
+                <td><span class="badge bg-light text-dark border">💻 {{ t.equipo }}</span></td>
+        
+                <td>
+                    {% if '🚨' in t.problema %}
+                        <span class="text-danger fw-bold small"><i class="fas fa-shield-alt"></i> {{ t.problema }}</span>
+                    {% else %}
+                        <small class="text-muted">{{ t.problema }}</small>
+                    {% endif %}
+                </td>
+
+                <td class="fw-bold text-primary" style="font-size: 0.85rem;">{{ t.falla_humana or '-' }}</td>
+
+                <td><small class="text-muted">{{ t.comentarios or '-' }}</small></td>
+        
+                <td>
+                    <span class="badge 
+                        {% if t.solucion == 'Solucionado' %} bg-success 
+                        {% elif t.solucion == 'En curso' %} bg-info text-dark 
+                        {% else %} bg-warning text-dark {% endif %}">
+                        {{ t.solucion }}
+            </span>
+        </td>
                     <td class="text-end pe-3">
                         <div class="btn-group">
                             <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalEdit{{t.id}}"><i class="fas fa-cog"></i></button>
@@ -247,13 +262,17 @@
             <form action="/actualizar_ticket/{{t.id}}" method="POST" class="modal-content">
                 <div class="modal-header bg-primary text-white"><h5 class="modal-title">Editar Ticket</h5></div>
                 <div class="modal-body p-4">
-                    <label class="small fw-bold">ESTADO:</label>
+                    <label class="small fw-bold">ESTADO DEL TICKET:</label>
                     <select name="estado" class="form-select mb-3">
                         <option value="Pendiente" {{'selected' if t.solucion=='Pendiente'}}>Pendiente</option>
-                        <option value="Solucionado" {{'selected' if t.solucion=='Solucionado'}}>Solucionado</option>
+                        <option value="En curso" {{'selected' if t.solucion=='En curso'}}>En curso</option> <option value="Solucionado" {{'selected' if t.solucion=='Solucionado'}}>Solucionado</option>
                     </select>
-                    <label class="small fw-bold">SOLUCIÓN:</label>
-                    <textarea name="comentario" class="form-control" required>{{t.comentarios}}</textarea>
+    
+                    <label class="small fw-bold">DIAGNÓSTICO TI (FALLA REAL):</label>
+                    <input type="text" name="falla_humana" class="form-control mb-3" value="{{t.falla_humana or ''}}" placeholder="Ej. Pantalla estrellada o Virus">
+
+                    <label class="small fw-bold">SOLUCIÓN / NOTAS TÉCNICAS:</label>
+                    <textarea name="comentario" class="form-control" rows="3">{{t.comentarios or ''}}</textarea>
                 </div>
                 <div class="modal-footer"><button type="submit" class="btn btn-primary w-100 rounded-pill">Guardar</button></div>
             </form>

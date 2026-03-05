@@ -32,104 +32,33 @@ def login_required(f):
 # --- RUTA DEL AGENTE (HARDWARE + SOFTWARE) ---
 @app.route('/reporte_agente', methods=['POST'])
 def reporte_agente():
-    data = request.get_json()
-    if not data: return jsonify({"status": "error"}), 400
+    data = request.json
+    hostname = data.get('equipo')
     
-    hostname = data.get('equipo'); usuario = data.get('usuario')
-    ip = data.get('ip_v4', '0.0.0.0'); mac = data.get('mac', 'N/A')
-    specs = f"RAM: {data.get('ram_total')} | Disco: {data.get('disco_total')}"
-    serie = data.get('n_serie', 'N/A'); marca = data.get('marca', 'N/A'); modelo = data.get('modelo', 'N/A')
-    software_recibido = data.get('software', [])
-
-    conn = conectar_db(); cursor = conn.cursor()
+    # Creamos el diagnóstico técnico (lo que irá a "Diagnóstico Agente")
+    diagnostico_tecnico = f"RAM: {data.get('ram_uso')} | {data.get('disco_libre')}"
     
-    # 1. BÚSQUEDA ROBUSTA DEL EQUIPO
-    existe = None
-    if mac and mac != "N/A":
-        cursor.execute("SELECT id FROM inventario WHERE mac_address = ?", (mac,))
-        existe = cursor.fetchone()
+    # Lógica de Software Prohibido
+    software_instalado = data.get('software', [])
+    prohibidos = ["TeamViewer", "AnyDesk", "AeroAdmin"]
+    hallazgos = [s['nombre'] for s in software_instalado if any(p in s['nombre'] for p in prohibidos)]
     
-    if not existe:
-        cursor.execute("SELECT id FROM inventario WHERE nombre_equipo = ?", (hostname,))
-        existe = cursor.fetchone()
+    if hallazgos:
+        diagnostico_tecnico = f"🚨 PROHIBIDO: {', '.join(hallazgos)} | " + diagnostico_tecnico
+
+    conn = conectar_db()
+    cursor = conn.cursor()
     
-    # 2. ACTUALIZAR O INSERTAR
-    if existe:
-        cursor.execute("""UPDATE inventario SET ip_address=?, especificaciones=?, usuario=?, n_serie=?, marca=?, modelo=?, mac_address=? WHERE id=?""", 
-                       (ip, specs, usuario, serie, marca, modelo, mac, existe['id']))
-    else:
-        cursor.execute("""INSERT INTO inventario (nombre_equipo, usuario, especificaciones, ip_address, n_serie, marca, modelo, mac_address, tipo_red, ubicacion, fecha_asignacion) 
-                          VALUES (?,?,?,?,?,?,?,?,?,?,?)""", 
-                       (hostname, usuario, specs, ip, serie, marca, modelo, mac, 'Ethernet', 'Monterrey', datetime.now().strftime('%Y-%m-%d')))
+    # Paso importante: Insertamos en 'problema' (Diagnóstico Agente) 
+    # y dejamos 'falla_humana' como '-' para que se llene manual después.
+    cursor.execute("""
+        INSERT INTO incidencias (usuario, equipo, problema, solucion, falla_humana)
+        VALUES (?, ?, ?, ?, ?)
+    """, (data.get('usuario'), hostname, diagnostico_tecnico, 'Pendiente', '-'))
     
-    # 3. ACTUALIZACIÓN DE SOFTWARE Y DETECCIÓN DE PROHIBIDOS
-    cursor.execute("DELETE FROM software_inventario WHERE nombre_equipo = ?", (hostname,))
-    prohibidos_hallados = []
-
-    for s in software_recibido:
-        n_sw = s['nombre']; v_sw = s['version']
-        cursor.execute("INSERT INTO software_inventario (nombre_equipo, nombre_software, version, fecha_escaneo) VALUES (?,?,?,?)",
-                       (hostname, n_sw, v_sw, datetime.now().strftime('%Y-%m-%d')))
-        
-        if any(p.lower() in n_sw.lower() for p in SOFTWARE_PROHIBIDO):
-            prohibidos_hallados.append(n_sw)
-
-    # --- 4. NUEVA LÓGICA DE TELEMETRÍA (HARDWARE CRÍTICO) ---
-    alertas_hw = []
-    info_recursos = f"🧠{data.get('ram_uso')} | 💾{data.get('disco_libre')}"
-    
-    try:
-        # 1. Procesar RAM: Usamos float() porque viene con decimales '81.3'
-        ram_str = data.get('ram_uso', '0').replace('%', '').strip()
-        uso_ram_num = float(ram_str)  # Ahora acepta '81.3'
-        
-        # 2. Procesar Disco: Limpieza más profunda
-        disco_libre_str = data.get('disco_libre', '100GB').upper()
-        # Quitamos 'GB' y 'LIBRES' para dejar solo el número
-        disco_limpio = disco_libre_str.replace('GB', '').replace('LIBRES', '').strip()
-        disco_num = float(disco_limpio)
-
-        # Evaluación de límites (Usando tu prueba de < 500)
-        if uso_ram_num > 90:
-            alertas_hw.append(f"RAM SATURADA ({uso_ram_num}%)")
-        if disco_num < 20:
-            alertas_hw.append(f"DISCO CRÍTICO ({disco_num}GB Libres)")
-            
-    except Exception as e:
-        print(f"Error procesando hardware de {hostname}: {e}")
-
-    # --- 5. CONSOLIDACIÓN DE INCIDENCIA MEJORADA ---
-    falla_texto = ""
-    estado_ticket = "Pendiente"
-
-    # 1. Verificamos Software Prohibido
-    if prohibidos_hallados:
-        falla_texto = f"⚠️ PROHIBIDO: {', '.join(prohibidos_hallados)}"
-        estado_ticket = "Prohibido"
-
-    # 2. Verificamos Alertas de Hardware (AQUÍ ESTÁ EL TRUCO)
-    if alertas_hw:
-        # Si ya había texto de software, añadimos un separador, si no, empezamos el texto
-        prefijo = " | " if falla_texto else ""
-        falla_texto += f"{prefijo}🚨 HW: {', '.join(alertas_hw)}"
-        # Si no hay software prohibido pero sí falla de hardware, lo marcamos como Pendiente
-        if not prohibidos_hallados:
-            estado_ticket = "Pendiente"
-
-    # 3. Resultado Final
-    if not falla_texto:
-        problema_final = f"Auditoría OK | {info_recursos}"
-    else:
-        # Aquí unimos las alertas encontradas con la info de recursos al final
-        problema_final = f"{falla_texto} | {info_recursos}"
-
-    # Importante: Asegúrate de que el orden de las columnas coincida con tu tabla SQL
-    print(f"DEBUG: Guardando incidencia -> {problema_final}") # AÑADE ESTA LÍNEA
-    cursor.execute("INSERT INTO incidencias (equipo, usuario, problema, solucion, fecha) VALUES (?,?,?,?,?)", 
-                    (hostname, usuario, problema_final, estado_ticket, datetime.now().strftime('%Y-%m-%d %H:%M')))
-    
-    conn.commit(); conn.close()
-    return jsonify({"status": "success"}), 200
+    conn.commit()
+    conn.close()
+    return {"status": "success"}, 200
 
 # --- CONSULTA SOFTWARE ---
 @app.route('/ver_software/<hostname>')
@@ -264,9 +193,26 @@ def logout(): session.clear(); return redirect(url_for('login'))
 
 # --- RUTAS DE ACCIONES (ESTABLES) ---
 @app.route('/actualizar_ticket/<int:id>', methods=['POST'])
-@login_required
 def actualizar_ticket(id):
-    conn = conectar_db(); conn.execute("UPDATE incidencias SET solucion = ?, comentarios = ? WHERE id = ?", (request.form['estado'], request.form['comentario'], id)); conn.commit(); conn.close(); return redirect('/#tickets')
+    estado = request.form.get('estado')
+    falla_manual = request.form.get('falla_humana')
+    solucion = request.form.get('comentario')
+    
+    conn = conectar_db()
+    cursor = conn.cursor()
+    
+    # Actualizamos los 3 campos clave
+    cursor.execute("""
+        UPDATE incidencias 
+        SET solucion=?, falla_humana=?, comentarios=? 
+        WHERE id=?
+    """, (estado, falla_manual, solucion, id))
+    
+    conn.commit()
+    conn.close()
+    
+    # Aquí es donde el Dashboard se refresca con los nuevos estados
+    return redirect(url_for('dashboard'))
 
 @app.route('/eliminar_ticket/<int:id>')
 @login_required

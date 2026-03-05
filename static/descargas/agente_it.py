@@ -61,7 +61,8 @@ def enviar_reporte():
             "disco_libre": f"{psutil.disk_usage('C:').free // (1024**3)}GB Libres",
             "n_serie": get_hw_info("serial"), "marca": get_hw_info("brand"), "modelo": get_hw_info("modelo"),
             "mac": get_mac_address(),
-            "software": get_installed_software() # Nueva data
+            "software": get_installed_software(), # Nueva data
+            "tipo_reporte": "AUDITORIA_AGENTE" # Campo nuevo para que el servidor sepa clasificarlo
         }
         requests.post(URL_DESTINO, json=payload, timeout=20)
         ctypes.windll.user32.MessageBoxW(0, f"✅ Reporte de Auditoría enviado para {hostname}", "IT Toolbox", 0x40)
