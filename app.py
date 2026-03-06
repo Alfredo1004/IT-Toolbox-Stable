@@ -11,6 +11,12 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import pytz
 from datetime import datetime
+from werkzeug.utils import secure_filename
+import os
+
+# Configuración de carpetas
+UPLOAD_FOLDER = 'static/uploads/facturas'
+ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
 
 # Configura la zona horaria de México
 zona_mx = pytz.timezone('America/Monterrey')
@@ -288,8 +294,8 @@ Por favor no respondas a este correo.
 """
 
     # === CORREOS DE PRUEBA ===
-    correo_gerente = "tu_correo_real@tuempresa.com"  # <-- PON TU CORREO DE GERENTE
-    correo_usuario = "otro_correo_prueba@gmail.com"  # <-- PON UN CORREO SECUNDARIO TUYO
+    correo_gerente = "alfredo.valadez@strd.com.mx"  # <-- PON TU CORREO DE GERENTE
+    correo_usuario = "erick.flores@strd.com.mx"  # <-- PON UN CORREO SECUNDARIO TUYO
     
     lista_destinatarios = [correo_gerente, correo_usuario]
     
@@ -578,24 +584,57 @@ def agregar_gasto():
     cantidad = int(request.form.get('cantidad', 1))
     precio_unitario = float(request.form.get('precio_unitario', 0))
 
+    # Manejo del archivo PDF/Imagen
+    factura_file = request.files.get('factura')
+    nombre_archivo = "" # Por defecto vacío si no suben nada
+
+    if factura_file and factura_file.filename != '':
+        extension = factura_file.filename.rsplit('.', 1)[1].lower()
+        nuevo_nombre = f"factura_{fecha}_{proveedor.replace(' ', '_')}.{extension}"
+        nombre_archivo = secure_filename(nuevo_nombre)
+        factura_file.save(os.path.join(UPLOAD_FOLDER, nombre_archivo))
+
     conn = conectar_db(); cursor = conn.cursor()
+    # IMPORTANTE: Asegúrate de que el INSERT incluya 'factura_pdf'
     cursor.execute("""INSERT INTO gastos 
-        (fecha, proveedor, categoria, descripcion, sku, cantidad, precio_unitario) 
-        VALUES (?, ?, ?, ?, ?, ?, ?)""", 
-        (fecha, proveedor, categoria, descripcion, sku, cantidad, precio_unitario))
+        (fecha, proveedor, categoria, descripcion, sku, cantidad, precio_unitario, factura_pdf) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""", 
+        (fecha, proveedor, categoria, descripcion, sku, cantidad, precio_unitario, nombre_archivo)) # <--- Aquí faltaba 'nombre_archivo'
     conn.commit(); conn.close()
-    
-    # Redirigimos y mantenemos la pestaña de gastos abierta
+    flash("✅ Gasto registrado con éxito.", "success")
     return redirect(url_for('dashboard', tab='gastos'))
 
 @app.route('/eliminar_gasto/<int:id>')
 @login_required
 def eliminar_gasto(id):
     conn = conectar_db(); cursor = conn.cursor()
+    
+    # Buscamos si el gasto tiene un archivo asociado para borrarlo del disco
+    cursor.execute("SELECT factura_pdf FROM gastos WHERE id=?", (id,))
+    res = cursor.fetchone()
+    if res and res['factura_pdf']:
+        ruta_archivo = os.path.join(UPLOAD_FOLDER, res['factura_pdf'])
+        if os.path.exists(ruta_archivo):
+            os.remove(ruta_archivo) # Borra el archivo físico
+            
     cursor.execute("DELETE FROM gastos WHERE id=?", (id,))
     conn.commit(); conn.close()
+    return redirect(url_for('dashboard', tab='gastos'))
+
+@app.route('/borrar_factura_gasto/<int:id>')
+@login_required
+def borrar_factura_gasto(id):
+    conn = conectar_db(); cursor = conn.cursor()
+    cursor.execute("SELECT factura_pdf FROM gastos WHERE id=?", (id,))
+    res = cursor.fetchone()
+    if res and res['factura_pdf']:
+        ruta = os.path.join(UPLOAD_FOLDER, res['factura_pdf'])
+        if os.path.exists(ruta): 
+            os.remove(ruta) # Borrado físico
+            flash("🗑️ Archivo de factura eliminado permanentemente.", "warning")
     
-    # Redirigimos de vuelta a la pestaña de gastos
+    cursor.execute("UPDATE gastos SET factura_pdf='' WHERE id=?", (id,))
+    conn.commit(); conn.close()
     return redirect(url_for('dashboard', tab='gastos'))
 
 @app.route('/actualizar_gasto/<int:id>', methods=['POST'])
@@ -607,14 +646,27 @@ def actualizar_gasto(id):
     descripcion = request.form.get('descripcion')
     cantidad = int(request.form.get('cantidad'))
     precio_unitario = float(request.form.get('precio_unitario'))
+    factura_file = request.files.get('factura') # Lógica para subir nueva factura en edición
 
     conn = conectar_db(); cursor = conn.cursor()
-    cursor.execute("""UPDATE gastos SET 
-                   fecha=?, proveedor=?, categoria=?, descripcion=?, cantidad=?, precio_unitario=? 
-                   WHERE id=?""", 
-                   (fecha, proveedor, categoria, descripcion, cantidad, precio_unitario, id))
-    conn.commit(); conn.close()
+
+    if factura_file and factura_file.filename != '':
+        # Si suben uno nuevo, lo guardamos y actualizamos la columna
+        extension = factura_file.filename.rsplit('.', 1)[1].lower()
+        nombre_archivo = secure_filename(f"factura_{fecha}_{proveedor.replace(' ', '_')}.{extension}")
+        factura_file.save(os.path.join(UPLOAD_FOLDER, nombre_archivo))
+        
+        cursor.execute("""UPDATE gastos SET fecha=?, proveedor=?, categoria=?, descripcion=?, 
+                       cantidad=?, precio_unitario=?, factura_pdf=? WHERE id=?""", 
+                       (fecha, proveedor, categoria, descripcion, cantidad, precio_unitario, nombre_archivo, id))
+    else:
+        # Si no suben nada, solo actualizamos el texto
+        cursor.execute("""UPDATE gastos SET fecha=?, proveedor=?, categoria=?, descripcion=?, 
+                       cantidad=?, precio_unitario=? WHERE id=?""", 
+                       (fecha, proveedor, categoria, descripcion, cantidad, precio_unitario, id))
     
+    conn.commit(); conn.close()
+    flash("🔄 Gasto actualizado correctamente.", "info")
     return redirect(url_for('dashboard', tab='gastos'))
 
 @app.route('/generar_responsiva_equipo/<int:id>', methods=['POST'])

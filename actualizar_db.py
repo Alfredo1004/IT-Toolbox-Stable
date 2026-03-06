@@ -1,10 +1,10 @@
 import sqlite3
-conn = sqlite3.connect('soporte.db') # Ajusta el nombre de tu db
+conn = sqlite3.connect('soporte.db')
 cursor = conn.cursor()
 try:
-    cursor.execute("ALTER TABLE incidencias ADD COLUMN fecha_registro TEXT")
-    print("✅ Columna fecha_registro añadida.")
+    cursor.execute("ALTER TABLE gastos ADD COLUMN factura_pdf TEXT DEFAULT ''")
+    print("✅ Columna añadida en local.")
 except:
-    print("⚠️ La columna ya existe.")
+    print("⚠️ La columna ya existía.")
 conn.commit()
 conn.close()
