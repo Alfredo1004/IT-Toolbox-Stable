@@ -74,34 +74,38 @@ def login_required(f):
 @app.route('/reporte_agente', methods=['POST'])
 def reporte_agente():
     data = request.json
+    hostname = data.get('equipo')
+    usuario = data.get('usuario')
     ahora = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d %H:%M:%S")
     
-    # 1. SOLUCIÓN AL ERROR: Definimos 'hostname' extrayéndolo del JSON que envía el agente
-    hostname = data.get('equipo') 
+    # Preparar diagnóstico
+    diagnostico = f"RAM: {data.get('ram_uso')} | Disco: {data.get('disco_libre')}"
     
-    diagnostico_tecnico = f"RAM: {data.get('ram_uso')} | {data.get('disco_libre')}"
-    
-    software_instalado = data.get('software', [])
-    prohibidos = ["TeamViewer", "AnyDesk", "AeroAdmin"]
-    hallazgos = [s['nombre'] for s in software_instalado if any(p in s['nombre'] for p in prohibidos)]
-    
-    if hallazgos:
-        diagnostico_tecnico = f"🚨 PROHIBIDO: {', '.join(hallazgos)} | " + diagnostico_tecnico
-
     conn = conectar_db()
     cursor = conn.cursor()
 
-    # BUSQUEDA DEL CORREO EN EL INVENTARIO usando la variable ya definida
+    # --- PASO A: Verificar/Registrar en Inventario ---
     cursor.execute("SELECT correo FROM inventario WHERE nombre_equipo = ?", (hostname,))
-    res = cursor.fetchone()
-    correo_destino = res['correo'] if res else ""
-    
-    # 2. CORRECCIÓN DEL INSERT: Aseguramos que haya 7 "?" para las 7 columnas
+    equipo_existente = cursor.fetchone()
+
+    if not equipo_existente:
+        # Si no existe, lo creamos automáticamente para que aparezca en tu tabla de Inventario
+        cursor.execute("""
+            INSERT INTO inventario (nombre_equipo, usuario, especificaciones, fecha_asignacion, correo)
+            VALUES (?, ?, ?, ?, ?)
+        """, (hostname, usuario, diagnostico, ahora, ""))
+        conn.commit()
+        correo_destino = "" # Está vacío porque es nuevo
+    else:
+        # Si ya existía, jalamos el correo que tú ya le habías puesto manualmente
+        correo_destino = equipo_existente[0]
+
+    # --- PASO B: Crear la Incidencia ---
     cursor.execute("""
         INSERT INTO incidencias 
         (usuario, equipo, problema, solucion, falla_humana, fecha_registro, correo_usuario)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (data.get('usuario'), hostname, diagnostico_tecnico, 'Pendiente', '-', ahora, correo_destino))
+    """, (usuario, hostname, diagnostico, 'Pendiente', '-', ahora, correo_destino))
     
     conn.commit()
     conn.close()
@@ -250,6 +254,7 @@ def logout(): session.clear(); return redirect(url_for('login'))
 
 # --- RUTAS DE ACCIONES (ESTABLES) ---
 @app.route('/actualizar_ticket/<int:id>', methods=['POST'])
+@login_required
 def actualizar_ticket(id):
     estado = request.form.get('estado')
     falla_manual = request.form.get('falla_humana')
@@ -259,8 +264,11 @@ def actualizar_ticket(id):
     ahora = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d %H:%M:%S")
 
     conn = conectar_db()
+    # Usamos Row para poder acceder por nombre de columna: t['correo']
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
+    # 1. Actualizamos los datos del ticket en la base de datos
     cursor.execute("""
         UPDATE incidencias 
         SET solucion=?, falla_humana=?, comentarios=? 
@@ -268,17 +276,24 @@ def actualizar_ticket(id):
     """, (estado, falla_manual, solucion, id))
     conn.commit()
 
-    # CAMBIO 1: Agregamos correo_usuario a la consulta SELECT
-    cursor.execute("SELECT usuario, equipo, correo_usuario FROM incidencias WHERE id=?", (id,))
+    # 2. BUSQUEDA EN TIEMPO REAL: Buscamos el correo actual en el Inventario vinculado a este ticket
+    cursor.execute("""
+        SELECT i.usuario, i.equipo, inv.correo 
+        FROM incidencias i
+        LEFT JOIN inventario inv ON i.equipo = inv.nombre_equipo
+        WHERE i.id = ?
+    """, (id,))
+    
     t = cursor.fetchone()
     conn.close()
 
-    # ==========================================
-    # PREPARAR Y ENVIAR EL CORREO
-    # ==========================================
-    nombre_usuario = t[0]
-    equipo_usuario = t[1]
-    correo_destino = t[2] # CAMBIO 2: Extraemos el correo de la base de datos
+    if not t:
+        return redirect(url_for('dashboard'))
+
+    # 3. PREPARAR DATOS PARA EL ENVÍO
+    nombre_usuario = t['usuario']
+    equipo_usuario = t['equipo']
+    correo_destino = t['correo'] # Extraído directamente del Inventario actualizado
     
     asunto = f"Actualización de Ticket #{id} - {equipo_usuario} [{estado}]"
     
@@ -301,18 +316,18 @@ Este es un mensaje generado automáticamente por IT TOOLBOX PRO.
 Por favor no respondas a este correo.
 """
 
-    # CAMBIO 3: Destinatarios dinámicos
-    correo_gerente = "alfredo.valadez@strd.com.mx"  # Tu correo siempre fijo
-    
+    # 4. ENVÍO DINÁMICO
+    correo_gerente = "alfredo.valadez@strd.com.mx"
     lista_destinatarios = [correo_gerente]
     
-    # Validamos que el usuario tenga un correo real antes de agregarlo a la lista
-    if correo_destino and "@" in correo_destino:
+    # Validamos si el inventario ya tiene un correo para este equipo
+    if correo_destino and "@" in str(correo_destino):
         lista_destinatarios.append(correo_destino)
     
-    # Disparamos la función
+    # Disparamos la función de envío
     enviar_notificacion(lista_destinatarios, asunto, cuerpo)
 
+    flash(f"Ticket #{id} actualizado. Notificación enviada.", "success")
     return redirect(url_for('dashboard'))
 
 @app.route('/eliminar_ticket/<int:id>')
