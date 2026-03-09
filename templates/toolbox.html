@@ -405,6 +405,10 @@
                     <div class="row g-3">
                         <div class="col-md-6"><label class="small fw-bold">HOSTNAME:</label><input type="text" name="nombre" class="form-control" value="{{e.nombre_equipo}}"></div>
                         <div class="col-md-6"><label class="small fw-bold">USUARIO:</label><input type="text" name="usuario" class="form-control" value="{{e.usuario}}"></div>
+                        <div class="col-md-12">
+                            <label class="small fw-bold text-primary"><i class="fas fa-envelope me-1"></i>CORREO DEL USUARIO:</label>
+                            <input type="email" name="correo" class="form-control" value="{{ e.correo or '' }}">
+                        </div>
                         <div class="col-md-4"><label class="small fw-bold">MARCA:</label><input type="text" name="marca" class="form-control" value="{{e.marca or ''}}"></div>
                         <div class="col-md-4"><label class="small fw-bold">MODELO:</label><input type="text" name="modelo" class="form-control" value="{{e.modelo or ''}}"></div>
                         <div class="col-md-4"><label class="small fw-bold">SERIE:</label><input type="text" name="serie" class="form-control" value="{{e.n_serie or ''}}"></div>
@@ -925,6 +929,10 @@
                         <label class="small fw-bold">USUARIO:</label>
                         <input type="text" name="usuario" class="form-control" placeholder="Ej: STOCK o Nombre">
                     </div>
+                    <div class="col-md-12">
+                        <label class="small fw-bold text-primary"><i class="fas fa-envelope me-1"></i>CORREO DEL USUARIO:</label>
+                        <input type="email" name="correo" class="form-control" placeholder="ejemplo@strd.com.mx">
+                    </div>
                     <div class="col-md-4">
                         <label class="small fw-bold">MARCA:</label>
                         <input type="text" name="marca" class="form-control">
@@ -962,6 +970,7 @@
                     </div>
                 </div>
             </div>
+                    
             <div class="modal-footer bg-light">
                 <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">Cancelar</button>
                 <button type="submit" class="btn btn-primary px-4 rounded-pill shadow fw-bold">Guardar Equipo en Inventario</button>

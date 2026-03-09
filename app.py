@@ -74,12 +74,13 @@ def login_required(f):
 @app.route('/reporte_agente', methods=['POST'])
 def reporte_agente():
     data = request.json
-    ahora = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d %H:%M:%S") # Genera la estampa de tiempo
+    ahora = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d %H:%M:%S")
     
-    # Preparamos el diagnóstico técnico
+    # 1. SOLUCIÓN AL ERROR: Definimos 'hostname' extrayéndolo del JSON que envía el agente
+    hostname = data.get('equipo') 
+    
     diagnostico_tecnico = f"RAM: {data.get('ram_uso')} | {data.get('disco_libre')}"
     
-    # Lógica de Software Prohibido
     software_instalado = data.get('software', [])
     prohibidos = ["TeamViewer", "AnyDesk", "AeroAdmin"]
     hallazgos = [s['nombre'] for s in software_instalado if any(p in s['nombre'] for p in prohibidos)]
@@ -89,13 +90,18 @@ def reporte_agente():
 
     conn = conectar_db()
     cursor = conn.cursor()
+
+    # BUSQUEDA DEL CORREO EN EL INVENTARIO usando la variable ya definida
+    cursor.execute("SELECT correo FROM inventario WHERE nombre_equipo = ?", (hostname,))
+    res = cursor.fetchone()
+    correo_destino = res['correo'] if res else ""
     
-    # Insertamos los 6 campos correspondientes (agregando fecha_registro)
+    # 2. CORRECCIÓN DEL INSERT: Aseguramos que haya 7 "?" para las 7 columnas
     cursor.execute("""
         INSERT INTO incidencias 
-        (usuario, equipo, problema, solucion, falla_humana, fecha_registro)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (data.get('usuario'), data.get('equipo'), diagnostico_tecnico, 'Pendiente', '-', ahora))
+        (usuario, equipo, problema, solucion, falla_humana, fecha_registro, correo_usuario)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (data.get('usuario'), hostname, diagnostico_tecnico, 'Pendiente', '-', ahora, correo_destino))
     
     conn.commit()
     conn.close()
@@ -262,7 +268,8 @@ def actualizar_ticket(id):
     """, (estado, falla_manual, solucion, id))
     conn.commit()
 
-    cursor.execute("SELECT usuario, equipo FROM incidencias WHERE id=?", (id,))
+    # CAMBIO 1: Agregamos correo_usuario a la consulta SELECT
+    cursor.execute("SELECT usuario, equipo, correo_usuario FROM incidencias WHERE id=?", (id,))
     t = cursor.fetchone()
     conn.close()
 
@@ -271,6 +278,7 @@ def actualizar_ticket(id):
     # ==========================================
     nombre_usuario = t[0]
     equipo_usuario = t[1]
+    correo_destino = t[2] # CAMBIO 2: Extraemos el correo de la base de datos
     
     asunto = f"Actualización de Ticket #{id} - {equipo_usuario} [{estado}]"
     
@@ -293,11 +301,14 @@ Este es un mensaje generado automáticamente por IT TOOLBOX PRO.
 Por favor no respondas a este correo.
 """
 
-    # === CORREOS DE PRUEBA ===
-    correo_gerente = "alfredo.valadez@strd.com.mx"  # <-- PON TU CORREO DE GERENTE
-    correo_usuario = "erick.flores@strd.com.mx"  # <-- PON UN CORREO SECUNDARIO TUYO
+    # CAMBIO 3: Destinatarios dinámicos
+    correo_gerente = "alfredo.valadez@strd.com.mx"  # Tu correo siempre fijo
     
-    lista_destinatarios = [correo_gerente, correo_usuario]
+    lista_destinatarios = [correo_gerente]
+    
+    # Validamos que el usuario tenga un correo real antes de agregarlo a la lista
+    if correo_destino and "@" in correo_destino:
+        lista_destinatarios.append(correo_destino)
     
     # Disparamos la función
     enviar_notificacion(lista_destinatarios, asunto, cuerpo)
