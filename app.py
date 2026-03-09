@@ -76,36 +76,50 @@ def reporte_agente():
     data = request.json
     hostname = data.get('equipo')
     usuario = data.get('usuario')
-    ahora = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d %H:%M:%S")
+    # Extraer solo la fecha (Sin hora) para el inventario
+    fecha_hoy = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d")
+    # Estampa completa para el ticket
+    ahora_full = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d %H:%M:%S")
     
-    # Preparar diagnóstico
-    diagnostico = f"RAM: {data.get('ram_uso')} | Disco: {data.get('disco_libre')}"
+    # --- REINTEGRACIÓN DE FORMATO DE DIAGNÓSTICO ---
+    diagnostico_tecnico = f"🧠 {data.get('ram_uso')} | 💾 {data.get('disco_libre')}"
     
+    # Lógica de Software Prohibido
+    software_instalado = data.get('software', [])
+    prohibidos = ["TeamViewer", "AnyDesk", "AeroAdmin", "Torrent", "Steam"]
+    hallazgos = [s['nombre'] for s in software_instalado if any(p in s['nombre'] for p in prohibidos)]
+    
+    if hallazgos:
+        diagnostico_tecnico = f"🚨 PROHIBIDO: {', '.join(hallazgos)} | " + diagnostico_tecnico
+
     conn = conectar_db()
     cursor = conn.cursor()
 
-    # --- PASO A: Verificar/Registrar en Inventario ---
+    # --- PASO A: Verificar/Registrar en Inventario con TODOS los campos ---
     cursor.execute("SELECT correo FROM inventario WHERE nombre_equipo = ?", (hostname,))
     equipo_existente = cursor.fetchone()
 
     if not equipo_existente:
-        # Si no existe, lo creamos automáticamente para que aparezca en tu tabla de Inventario
+        # Registramos con IP, MAC, Serie y Modelo extraídos del agente
         cursor.execute("""
-            INSERT INTO inventario (nombre_equipo, usuario, especificaciones, fecha_asignacion, correo)
-            VALUES (?, ?, ?, ?, ?)
-        """, (hostname, usuario, diagnostico, ahora, ""))
+            INSERT INTO inventario 
+            (nombre_equipo, usuario, especificaciones, fecha_asignacion, ip_address, mac_address, n_serie, modelo, marca, correo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            hostname, usuario, f"RAM Total: {data.get('ram_total')} | Disco: {data.get('disco_total')}", 
+            fecha_hoy, data.get('ip'), data.get('mac'), data.get('serie'), data.get('modelo'), data.get('marca'), ""
+        ))
         conn.commit()
-        correo_destino = "" # Está vacío porque es nuevo
+        correo_destino = ""
     else:
-        # Si ya existía, jalamos el correo que tú ya le habías puesto manualmente
         correo_destino = equipo_existente[0]
 
-    # --- PASO B: Crear la Incidencia ---
+    # --- PASO B: Crear la Incidencia con formato enriquecido ---
     cursor.execute("""
         INSERT INTO incidencias 
         (usuario, equipo, problema, solucion, falla_humana, fecha_registro, correo_usuario)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (usuario, hostname, diagnostico, 'Pendiente', '-', ahora, correo_destino))
+    """, (usuario, hostname, diagnostico_tecnico, 'Pendiente', '-', ahora_full, correo_destino))
     
     conn.commit()
     conn.close()
@@ -264,11 +278,9 @@ def actualizar_ticket(id):
     ahora = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d %H:%M:%S")
 
     conn = conectar_db()
-    # Usamos Row para poder acceder por nombre de columna: t['correo']
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    # 1. Actualizamos los datos del ticket en la base de datos
     cursor.execute("""
         UPDATE incidencias 
         SET solucion=?, falla_humana=?, comentarios=? 
@@ -276,56 +288,51 @@ def actualizar_ticket(id):
     """, (estado, falla_manual, solucion, id))
     conn.commit()
 
-    # 2. BUSQUEDA EN TIEMPO REAL: Buscamos el correo actual en el Inventario vinculado a este ticket
+    # Búsqueda vinculada al inventario para obtener el correo más reciente
     cursor.execute("""
         SELECT i.usuario, i.equipo, inv.correo 
         FROM incidencias i
         LEFT JOIN inventario inv ON i.equipo = inv.nombre_equipo
         WHERE i.id = ?
     """, (id,))
-    
     t = cursor.fetchone()
     conn.close()
 
-    if not t:
-        return redirect(url_for('dashboard'))
+    # --- ENVÍO DE CORREO MULTI-ESTADO ---
+    if t:
+        nombre_usuario = t['usuario']
+        equipo_usuario = t['equipo']
+        correo_destino = t['correo']
+        
+        asunto = f"Actualización de Ticket #{id} - {equipo_usuario} [{estado}]"
+        
+        # El cuerpo del correo ahora refleja cualquier cambio de estado
+        cuerpo = f"""Hola {nombre_usuario},
 
-    # 3. PREPARAR DATOS PARA EL ENVÍO
-    nombre_usuario = t['usuario']
-    equipo_usuario = t['equipo']
-    correo_destino = t['correo'] # Extraído directamente del Inventario actualizado
-    
-    asunto = f"Actualización de Ticket #{id} - {equipo_usuario} [{estado}]"
-    
-    cuerpo = f"""Hola {nombre_usuario},
-
-El departamento de TI ha actualizado el estado de tu reporte técnico.
+Se ha registrado una actualización en tu reporte técnico:
 
 DETALLES DEL TICKET:
 --------------------------------------------------
 Folio: #{id}
-Fecha de actualización: {ahora}
 Equipo: {equipo_usuario}
+Estado: {estado}
+Fecha: {ahora}
 
-ESTADO ACTUAL: {estado}
 DIAGNÓSTICO TÉCNICO: {falla_manual}
-SOLUCIÓN / NOTAS: {solucion}
+NOTAS DE TI: {solucion}
 --------------------------------------------------
 
-Este es un mensaje generado automáticamente por IT TOOLBOX PRO. 
-Por favor no respondas a este correo.
+Atentamente,
+Departamento de Soporte TI
 """
 
-    # 4. ENVÍO DINÁMICO
-    correo_gerente = "alfredo.valadez@strd.com.mx"
-    lista_destinatarios = [correo_gerente]
-    
-    # Validamos si el inventario ya tiene un correo para este equipo
-    if correo_destino and "@" in str(correo_destino):
-        lista_destinatarios.append(correo_destino)
-    
-    # Disparamos la función de envío
-    enviar_notificacion(lista_destinatarios, asunto, cuerpo)
+        correo_gerente = "alfredo.valadez@strd.com.mx"
+        lista_destinatarios = [correo_gerente]
+        
+        if correo_destino and "@" in str(correo_destino):
+            lista_destinatarios.append(correo_destino)
+        
+        enviar_notificacion(lista_destinatarios, asunto, cuerpo)
 
     flash(f"Ticket #{id} actualizado. Notificación enviada.", "success")
     return redirect(url_for('dashboard'))
