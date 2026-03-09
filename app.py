@@ -76,17 +76,15 @@ def reporte_agente():
     data = request.json
     hostname = data.get('equipo')
     usuario = data.get('usuario')
-    # Extraer solo la fecha (Sin hora) para el inventario
     fecha_hoy = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d")
-    # Estampa completa para el ticket
     ahora_full = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d %H:%M:%S")
     
-    # --- REINTEGRACIÓN DE FORMATO DE DIAGNÓSTICO ---
+    # Formato de diagnóstico para la tabla de Incidencias
     diagnostico_tecnico = f"🧠 {data.get('ram_uso')} | 💾 {data.get('disco_libre')}"
     
     # Lógica de Software Prohibido
     software_instalado = data.get('software', [])
-    prohibidos = ["TeamViewer", "AnyDesk", "AeroAdmin", "Torrent", "Steam"]
+    prohibidos = ["TeamViewer", "AnyDesk", "AeroAdmin", "Torrent", "Steam", "Spotify"]
     hallazgos = [s['nombre'] for s in software_instalado if any(p in s['nombre'] for p in prohibidos)]
     
     if hallazgos:
@@ -95,26 +93,34 @@ def reporte_agente():
     conn = conectar_db()
     cursor = conn.cursor()
 
-    # --- PASO A: Verificar/Registrar en Inventario con TODOS los campos ---
     cursor.execute("SELECT correo FROM inventario WHERE nombre_equipo = ?", (hostname,))
     equipo_existente = cursor.fetchone()
 
+    # Combinamos RAM, Disco y Procesador para las Especificaciones
+    specs = f"RAM: {data.get('ram_total')} | Disco: {data.get('disco_total')} | CPU: {data.get('procesador')}"
+
     if not equipo_existente:
-        # Registramos con IP, MAC, Serie y Modelo extraídos del agente
+        # INSERT con los nombres de campos que envía el nuevo agente
         cursor.execute("""
             INSERT INTO inventario 
             (nombre_equipo, usuario, especificaciones, fecha_asignacion, ip_address, mac_address, n_serie, modelo, marca, correo)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            hostname, usuario, f"RAM Total: {data.get('ram_total')} | Disco: {data.get('disco_total')}", 
+            hostname, usuario, specs, 
             fecha_hoy, data.get('ip'), data.get('mac'), data.get('serie'), data.get('modelo'), data.get('marca'), ""
         ))
         conn.commit()
         correo_destino = ""
     else:
+        # UPDATE: Si ya existe, actualizamos los datos técnicos por si hubo un upgrade (RAM, IP, etc)
+        cursor.execute("""
+            UPDATE inventario SET 
+            ip_address=?, mac_address=?, especificaciones=?, usuario=? 
+            WHERE nombre_equipo=?
+        """, (data.get('ip'), data.get('mac'), specs, usuario, hostname))
         correo_destino = equipo_existente[0]
 
-    # --- PASO B: Crear la Incidencia con formato enriquecido ---
+    # Crear la Incidencia
     cursor.execute("""
         INSERT INTO incidencias 
         (usuario, equipo, problema, solucion, falla_humana, fecha_registro, correo_usuario)

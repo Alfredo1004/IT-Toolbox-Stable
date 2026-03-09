@@ -1,4 +1,4 @@
-import requests, psutil, socket, os, subprocess, sys, ctypes, winreg
+import requests, psutil, socket, os, subprocess, sys, ctypes, winreg, platform
 from datetime import datetime
 
 SERVER_IP = "192.168.128.107" 
@@ -8,17 +8,25 @@ def is_admin():
     try: return ctypes.windll.shell32.IsUserAnAdmin()
     except: return False
 
+def get_processor_info():
+    try:
+        # Intenta obtener el nombre comercial del procesador
+        return subprocess.check_output("wmic cpu get name", shell=True).decode(errors='ignore').split('\n')[1].strip()
+    except:
+        return platform.processor()
+
 def get_hw_info(tipo):
-    targets = ["csproduct", "bios", "systemenclosure"]
-    for t in targets:
-        try:
-            if tipo == "serial": cmd = f"wmic {t} get identifyingnumber" if t == "csproduct" else f"wmic {t} get serialnumber"
-            elif tipo == "modelo": cmd = f"wmic {t} get name"
-            else: cmd = f"wmic {t} get vendor" if t == "csproduct" else "wmic computersystem get manufacturer"
-            res = subprocess.check_output(cmd, shell=True).decode(errors='ignore').split('\n')
-            val = res[1].strip()
-            if val and not any(x in val.lower() for x in ["identifying", "serial", "name"]): return val
-        except: continue
+    # Comandos específicos para máxima compatibilidad con Dell, ASUS, Lenovo
+    cmds = {
+        "serial": "wmic bios get serialnumber",
+        "modelo": "wmic csproduct get name",
+        "marca": "wmic computersystem get manufacturer"
+    }
+    try:
+        res = subprocess.check_output(cmds[tipo], shell=True).decode(errors='ignore').split('\n')
+        val = res[1].strip()
+        if val: return val
+    except: pass
     return "N/A"
 
 def get_mac_address():
@@ -52,21 +60,31 @@ def get_installed_software():
 def enviar_reporte():
     try:
         hostname = socket.gethostname()
+        # Capturamos la IP de la interfaz activa de forma más segura
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+
         payload = {
-            "equipo": hostname, "usuario": os.getlogin(),
-            "ip_v4": socket.gethostbyname(hostname),
+            "equipo": hostname, 
+            "usuario": os.getlogin(),
+            "ip": local_ip,  # Cambiado de ip_v4 a ip para coincidir con app.py
             "ram_total": f"{round(psutil.virtual_memory().total / (1024**3))}GB",
             "disco_total": f"{round(psutil.disk_usage('C:').total / (1024**3))}GB",
             "ram_uso": f"{psutil.virtual_memory().percent}%",
             "disco_libre": f"{psutil.disk_usage('C:').free // (1024**3)}GB Libres",
-            "n_serie": get_hw_info("serial"), "marca": get_hw_info("brand"), "modelo": get_hw_info("modelo"),
+            "procesador": get_processor_info(), # Nuevo campo
+            "serie": get_hw_info("serial"),    # Cambiado de n_serie a serie
+            "marca": get_hw_info("marca"), 
+            "modelo": get_hw_info("modelo"),
             "mac": get_mac_address(),
-            "software": get_installed_software(), # Nueva data
-            "tipo_reporte": "AUDITORIA_AGENTE" # Campo nuevo para que el servidor sepa clasificarlo
+            "software": get_installed_software()
         }
         requests.post(URL_DESTINO, json=payload, timeout=20)
         ctypes.windll.user32.MessageBoxW(0, f"✅ Reporte de Auditoría enviado para {hostname}", "IT Toolbox", 0x40)
-    except: pass
+    except Exception as e:
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
     if is_admin(): enviar_reporte()
