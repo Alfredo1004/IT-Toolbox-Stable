@@ -323,28 +323,28 @@ def eliminar_ticket(id):
 @app.route('/actualizar_equipo/<int:id>', methods=['POST'])
 @login_required
 def actualizar_equipo(id):
-    nuevo_usuario = request.form['usuario'] # Definimos la variable
+    nuevo_usuario = request.form['usuario']
+    correo = request.form.get('correo', '') # 1. Recibimos el correo
+    
     conn = conectar_db(); cursor = conn.cursor()
     
-    # 1. Obtener usuario anterior
     cursor.execute("SELECT usuario FROM inventario WHERE id=?", (id,))
     fila = cursor.fetchone()
     usuario_anterior = fila[0] if fila else "N/A"
 
-    # 2. Registrar si hay cambio
     if usuario_anterior != nuevo_usuario:
         cursor.execute("""INSERT INTO historial_asignaciones 
             (tipo_activo, id_activo, usuario_anterior, usuario_nuevo, detalles) 
             VALUES (?, ?, ?, ?, ?)""", 
             ('Laptop', id, usuario_anterior, nuevo_usuario, 'Cambio de usuario en Inventario'))
 
-    # 3. Realizar el UPDATE
+    # 2. SE AGREGÓ correo=? y la variable correo al final
     cursor.execute("""UPDATE inventario SET nombre_equipo=?, usuario=?, n_serie=?, marca=?, 
                       modelo=?, ubicacion=?, fecha_asignacion=?, ip_address=?, tipo_red=?, 
-                      especificaciones=? WHERE id=?""", 
+                      especificaciones=?, correo=? WHERE id=?""", 
                    (request.form['nombre'], nuevo_usuario, request.form['serie'], request.form['marca'], 
                     request.form['modelo'], request.form['ubicacion'], request.form['fecha_asig'], 
-                    request.form['ip'], request.form['red'], request.form['specs'], id))
+                    request.form['ip'], request.form['red'], request.form['specs'], correo, id))
     
     conn.commit(); conn.close()
     return redirect('/#inventario')
@@ -436,12 +436,37 @@ def eliminar_nota(id):
 @app.route('/crear_incidencia_manual', methods=['POST'])
 @login_required
 def crear_incidencia_manual():
-    conn = conectar_db(); conn.execute("INSERT INTO incidencias (equipo, usuario, problema, solucion, fecha) VALUES (?,?,?,?,?)", (request.form['equipo_nombre'], request.form['usuario'], request.form['problema'], 'Pendiente', datetime.now().strftime('%Y-%m-%d %H:%M'))); conn.commit(); conn.close(); return redirect('/#tickets')
+    equipo = request.form['equipo_nombre']
+    conn = conectar_db(); cursor = conn.cursor()
+    
+    # Buscar correo en inventario
+    cursor.execute("SELECT correo FROM inventario WHERE nombre_equipo = ?", (equipo,))
+    res = cursor.fetchone()
+    correo_destino = res['correo'] if res else ""
+    
+    # Insertar el ticket manual con el correo encontrado
+    cursor.execute("""INSERT INTO incidencias 
+        (equipo, usuario, problema, solucion, fecha_registro, correo_usuario) 
+        VALUES (?,?,?,?,?,?)""", 
+        (equipo, request.form['usuario'], request.form['problema'], 'Pendiente', datetime.now().strftime('%Y-%m-%d %H:%M'), correo_destino))
+    
+    conn.commit(); conn.close()
+    return redirect('/#tickets')
 
 @app.route('/agregar_equipo', methods=['POST'])
 @login_required
 def agregar_equipo():
-    conn = conectar_db(); conn.execute("""INSERT INTO inventario (nombre_equipo, usuario, especificaciones, ip_address, tipo_red, n_serie, marca, modelo, ubicacion, fecha_asignacion) VALUES (?,?,?,?,?,?,?,?,?,?)""", (request.form['nombre'], request.form['usuario'], request.form['specs'], request.form['ip'], request.form['red'], request.form['serie'], request.form['marca'], request.form['modelo'], request.form['ubicacion'], request.form['fecha_asig'])); conn.commit(); conn.close(); return redirect('/#inventario')
+    correo = request.form.get('correo', '')
+    conn = conectar_db()
+    
+    # Asegúrate de que hay 11 columnas y 11 signos de interrogación
+    conn.execute("""INSERT INTO inventario 
+        (nombre_equipo, usuario, especificaciones, ip_address, tipo_red, n_serie, marca, modelo, ubicacion, fecha_asignacion, correo) 
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)""", 
+        (request.form['nombre'], request.form['usuario'], request.form['specs'], request.form['ip'], request.form['red'], request.form['serie'], request.form['marca'], request.form['modelo'], request.form['ubicacion'], request.form['fecha_asig'], correo))
+    
+    conn.commit(); conn.close()
+    return redirect('/#inventario')
 
 @app.route('/agregar_clave', methods=['POST'])
 @login_required
