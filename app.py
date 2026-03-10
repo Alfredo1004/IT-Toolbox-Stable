@@ -29,24 +29,27 @@ EMAIL_PASS = "votzjkyrdotybcsk"  # Tu contraseña de aplicación de 16 letras
 
 def enviar_notificacion(destinatarios, asunto, cuerpo):
     try:
+        # Aseguramos que los destinatarios sean una lista única sin duplicados
+        lista_final = list(set(destinatarios))
+        
         msg = MIMEMultipart()
-        msg['From'] = EMAIL_USER # Antes decía EMAIL_REMITENTE
-        msg['To'] = ", ".join(destinatarios)
+        msg['From'] = EMAIL_USER
+        msg['To'] = ", ".join(lista_final)
         msg['Subject'] = asunto
 
         msg.attach(MIMEText(cuerpo, 'plain'))
 
-        server = smtplib.SMTP(SMTP_SERVER, 587) # Usamos la variable SMTP_SERVER
-        server.starttls()
-        
-        # Usamos EMAIL_USER y EMAIL_PASS que definiste arriba
-        server.login(EMAIL_USER, EMAIL_PASS.replace(" ", ""))
-        server.sendmail(EMAIL_USER, destinatarios, msg.as_string())
-        server.quit()
-        print(f"✅ Notificación enviada a: {destinatarios}")
+        # Usamos un bloque "with" para asegurar que la conexión se cierre SIEMPRE
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(EMAIL_USER, EMAIL_PASS.replace(" ", ""))
+            server.sendmail(EMAIL_USER, lista_final, msg.as_string())
+            
+        print(f"✅ Notificación enviada correctamente a: {lista_final}")
+        return True
     except Exception as e:
-        # Esto te ayudará a ver el error real en los logs de PythonAnywhere si falla algo más
-        print(f"⚠️ Error al enviar correo: {str(e)}")
+        print(f"⚠️ Error crítico de correo: {str(e)}")
+        return False
 
 app = Flask(__name__)
 app.secret_key = 'it_toolbox_secure_key_2025'
@@ -280,13 +283,13 @@ def actualizar_ticket(id):
     falla_manual = request.form.get('falla_humana')
     solucion = request.form.get('comentario')
     
-    zona_mx = pytz.timezone('America/Monterrey')
     ahora = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d %H:%M:%S")
 
     conn = conectar_db()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
+    # 1. Guardar cambios en BD
     cursor.execute("""
         UPDATE incidencias 
         SET solucion=?, falla_humana=?, comentarios=? 
@@ -294,7 +297,7 @@ def actualizar_ticket(id):
     """, (estado, falla_manual, solucion, id))
     conn.commit()
 
-    # Búsqueda vinculada al inventario para obtener el correo más reciente
+    # 2. Buscar correo actualizado en Inventario
     cursor.execute("""
         SELECT i.usuario, i.equipo, inv.correo 
         FROM incidencias i
@@ -304,7 +307,6 @@ def actualizar_ticket(id):
     t = cursor.fetchone()
     conn.close()
 
-    # --- ENVÍO DE CORREO MULTI-ESTADO ---
     if t:
         nombre_usuario = t['usuario']
         equipo_usuario = t['equipo']
@@ -312,7 +314,6 @@ def actualizar_ticket(id):
         
         asunto = f"Actualización de Ticket #{id} - {equipo_usuario} [{estado}]"
         
-        # El cuerpo del correo ahora refleja cualquier cambio de estado
         cuerpo = f"""Hola {nombre_usuario},
 
 Se ha registrado una actualización en tu reporte técnico:
@@ -332,15 +333,17 @@ Atentamente,
 Departamento de Soporte TI
 """
 
-        correo_gerente = "alfredo.valadez@strd.com.mx"
-        lista_destinatarios = [correo_gerente]
+        # Gerente siempre recibe copia
+        lista_destinatarios = ["alfredo.valadez@strd.com.mx"]
         
+        # Validar si el usuario tiene correo en el inventario
         if correo_destino and "@" in str(correo_destino):
-            lista_destinatarios.append(correo_destino)
+            lista_destinatarios.append(correo_destino.strip())
         
+        # Disparar envío
         enviar_notificacion(lista_destinatarios, asunto, cuerpo)
 
-    flash(f"Ticket #{id} actualizado. Notificación enviada.", "success")
+    flash(f"Ticket #{id} actualizado con éxito.", "success")
     return redirect(url_for('dashboard'))
 
 @app.route('/eliminar_ticket/<int:id>')
@@ -515,7 +518,17 @@ def descargar_reporte_excel():
     conn = conectar_db()
     
     # 1. Consultas base
-    df_tickets = pd.read_sql_query("SELECT id as Folio, equipo as Equipo, usuario as Usuario, problema as Falla, fecha as Fecha FROM incidencias", conn)
+    df_tickets = pd.read_sql_query("""
+        SELECT 
+            id as Folio, 
+            equipo as Equipo, 
+            usuario as Usuario, 
+            falla_humana as Falla, 
+            comentarios as Solucion,
+            solucion as Estado,
+            fecha_registro as Fecha 
+        FROM incidencias
+    """, conn)
     df_inv = pd.read_sql_query("SELECT nombre_equipo, usuario, marca, modelo, n_serie, ubicacion, especificaciones FROM inventario", conn)
     df_cel = pd.read_sql_query("SELECT usuario, marca_modelo, imei, numero_tel, ubicacion FROM celulares", conn)
     df_gastos = pd.read_sql_query("SELECT fecha, proveedor, categoria, descripcion, cantidad, precio_unitario, (cantidad * precio_unitario) as Total FROM gastos", conn)
