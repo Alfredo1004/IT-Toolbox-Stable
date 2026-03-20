@@ -589,85 +589,113 @@
                 </div>
             </div>
             {% endfor %}
-        </div> <div class="tab-pane fade" id="boveda">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h3>Bóveda Claves</h3>
-                <button class="btn btn-danger rounded-pill px-4 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddClave">Nueva Clave</button>
+       </div> <div class="tab-pane fade" id="boveda">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>Bóveda Claves</h3>
+        <div class="d-flex gap-3 align-items-center">
+            <div class="input-group shadow-sm" style="max-width: 250px;">
+                <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+                <input type="text" class="form-control border-start-0" id="buscadorBoveda" placeholder="Buscar servicio o usuario...">
             </div>
-            <div class="row g-3" id="bovedaCards">
-                {% for c in claves %}
-                <div class="col-md-4 card-item">
-                    <div class="card card-custom p-3 border-start border-danger border-4 h-100">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="fw-bold mb-0 text-truncate">{{ c.servicio }}</h6>
-                            <div class="btn-group">
-                                <button class="btn btn-sm btn-link text-primary p-1" data-bs-toggle="modal" data-bs-target="#modalEditClave{{c.id}}"><i class="fas fa-edit"></i></button>
-                                <button class="btn btn-sm btn-link text-muted p-1" data-bs-toggle="modal" data-bs-target="#modalDelClave{{c.id}}"><i class="fas fa-times"></i></button>
-                            </div>
-                        </div>
-                        <small class="text-muted d-block mb-3">{{ c.usuario_acceso }}</small>
-                        <div class="pass-box d-flex justify-content-between align-items-center shadow-sm">
-                            <code class="text-danger fw-bold" id="pass{{ c.id }}" data-real="{{ c.password_acceso }}">********</code>
-                            <button class="btn btn-sm text-muted p-0" onclick="togglePass('{{ c.id }}')"><i class="fas fa-eye"></i></button>
-                        </div>
+            <button class="btn btn-danger rounded-pill px-4 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddClave">Nueva Clave</button>
+        </div>
+    </div>
+    
+    <div class="row g-3" id="bovedaCards">
+        {% for c in claves %}
+        <div class="col-md-4 card-item">
+            <div class="card card-custom p-3 border-start border-danger border-4 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="fw-bold mb-0 text-truncate">{{ c.servicio }}</h6>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-link text-primary p-1" data-bs-toggle="modal" data-bs-target="#modalEditClave{{c.id}}"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-sm btn-link text-muted p-1" data-bs-toggle="modal" data-bs-target="#modalDelClave{{c.id}}"><i class="fas fa-times"></i></button>
                     </div>
                 </div>
-                {% endfor %}
+                <small class="text-muted d-block mb-3">{{ c.usuario_acceso }}</small>
+                <div class="pass-box d-flex justify-content-between align-items-center shadow-sm">
+                    <code class="text-danger fw-bold" id="pass{{ c.id }}" data-real="{{ c.password_acceso }}">********</code>
+                    <button class="btn btn-sm text-muted p-0" onclick="togglePass('{{ c.id }}')"><i class="fas fa-eye"></i></button>
+                </div>
             </div>
-        </div> <div class="tab-pane fade" id="prestamos">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h3>Préstamos</h3>
-                <button class="btn btn-info text-white rounded-pill px-4 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddPrestamo">Registrar Salida</button>
+        </div>
+        {% endfor %}
+    </div>
+</div> 
+
+<div class="tab-pane fade" id="prestamos">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>Préstamos</h3>
+        <div class="d-flex gap-3 align-items-center">
+            <div class="input-group shadow-sm" style="max-width: 250px;">
+                <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+                <input type="text" class="form-control border-start-0" id="searchPrestamos" placeholder="Buscar artículo o usuario...">
             </div>
-            <div class="card card-custom p-0 overflow-hidden">
-                <table class="table align-middle m-0" id="tablePrestamos">
-                    <thead class="table-light"><tr><th class="ps-3">ARTÍCULO</th><th>USUARIO</th><th>SALIDA</th><th>RETORNO</th><th>ESTADO</th><th class="text-end pe-3">ACCIONES</th></tr></thead>
-                    <tbody>
-                        {% for p in prestamos %}
-                        <tr>
-                            <td class="ps-3"><strong>{{ p.articulo }}</strong></td>
-                            <td>{{ p.usuario_prestamo }}</td><td>{{ p.fecha_salida }}</td><td>{{ p.fecha_retorno_estimada }}</td>
-                            <td><span class="badge {{ 'bg-success' if p.estado == 'Devuelto' else 'bg-primary' }}">{{ p.estado }}</span></td>
-                            <td class="text-end pe-3">
-                                <div class="btn-group">
-                                    {% if p.estado == 'Activo' %}<a href="/finalizar_prestamo/{{p.id}}" class="btn btn-sm btn-outline-success"><i class="fas fa-check-circle"></i></a>{% endif %}
-                                    <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalDelPrestamo{{p.id}}"><i class="fas fa-trash"></i></button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div> <div class="tab-pane fade" id="wiki">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h3>Wiki Técnica</h3>
-                <button class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalAddWiki">Nueva Guía</button>
-            </div>
-            <div class="row g-3">
-                {% for w in wiki %}
-                <div class="col-12 wiki-item">
-                    <div class="card card-custom p-3 wiki-card">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <span class="badge bg-light text-primary border border-primary mb-2">{{ w.categoria }}</span>
-                                <h5 class="fw-bold mb-1">{{ w.titulo }}</h5>
-                                <small class="text-muted">Actualizado: {{ w.fecha_actualizacion }}</small>
-                            </div>
-                            <div class="btn-group align-self-start">
-                                <button class="btn btn-sm btn-outline-primary border-0" data-bs-toggle="modal" data-bs-target="#modalEditWiki{{w.id}}"><i class="fas fa-edit"></i></button>
-                                <button class="btn btn-sm btn-outline-danger border-0" data-bs-toggle="modal" data-bs-target="#modalDelWiki{{w.id}}"><i class="fas fa-trash"></i></button>
-                            </div>
+            <button class="btn btn-info text-white rounded-pill px-4 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddPrestamo">Registrar Salida</button>
+        </div>
+    </div>
+    <div class="card card-custom p-0 overflow-hidden">
+        <table class="table align-middle m-0" id="tablePrestamos">
+            <thead class="table-light"><tr><th class="ps-3">ARTÍCULO</th><th>USUARIO</th><th>SALIDA</th><th>RETORNO</th><th>ESTADO</th><th class="text-end pe-3">ACCIONES</th></tr></thead>
+            <tbody>
+                {% for p in prestamos %}
+                <tr>
+                    <td class="ps-3"><strong>{{ p.articulo }}</strong></td>
+                    <td>{{ p.usuario_prestamo }}</td><td>{{ p.fecha_salida }}</td><td>{{ p.fecha_retorno_estimada }}</td>
+                    <td><span class="badge {{ 'bg-success' if p.estado == 'Devuelto' else 'bg-primary' }}">{{ p.estado }}</span></td>
+                    <td class="text-end pe-3">
+                        <div class="btn-group">
+                            {% if p.estado == 'Activo' %}<a href="/finalizar_prestamo/{{p.id}}" class="btn btn-sm btn-outline-success"><i class="fas fa-check-circle"></i></a>{% endif %}
+                            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalDelPrestamo{{p.id}}"><i class="fas fa-trash"></i></button>
                         </div>
-                        <hr class="my-3"><div class="wiki-content">{{ w.contenido }}</div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div> <div class="tab-pane fade" id="wiki">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>Wiki Técnica</h3>
+        <div class="d-flex gap-3 align-items-center">
+            <div class="input-group shadow-sm" style="max-width: 300px;">
+                <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+                <input type="text" class="form-control border-start-0" id="buscadorWiki" placeholder="Buscar categoría o título...">
+            </div>
+            <button class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalAddWiki">Nueva Guía</button>
+        </div>
+    </div>
+    
+    <div class="row g-3" id="wikiCards">
+        {% for w in wiki %}
+        <div class="col-12 wiki-item">
+            <div class="card card-custom p-3 wiki-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <span class="badge bg-light text-primary border border-primary mb-2">{{ w.categoria }}</span>
+                        <h5 class="fw-bold mb-1">{{ w.titulo }}</h5>
+                        <small class="text-muted">Actualizado: {{ w.fecha_actualizacion }}</small>
+                    </div>
+                    <div class="btn-group align-self-start">
+                        <button class="btn btn-sm btn-outline-primary border-0" data-bs-toggle="modal" data-bs-target="#modalEditWiki{{w.id}}"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-sm btn-outline-danger border-0" data-bs-toggle="modal" data-bs-target="#modalDelWiki{{w.id}}"><i class="fas fa-trash"></i></button>
                     </div>
                 </div>
-                {% endfor %}
+                <hr class="my-3"><div class="wiki-content">{{ w.contenido }}</div>
             </div>
-        </div> <div class="tab-pane fade" id="mantenimiento">
-            <div class="d-flex justify-content-between mb-4">
+        </div>
+        {% endfor %}
+    </div>
+</div> <div class="tab-pane fade" id="mantenimiento">
+            <div class="d-flex justify-content-between align-items-center mb-4">
                 <h3>Mantenimiento</h3>
-                <button class="btn btn-success px-4 rounded-pill shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddManto">Registrar</button>
+                <div class="d-flex gap-3 align-items-center">
+                    <div class="input-group shadow-sm" style="max-width: 250px;">
+                        <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" class="form-control border-start-0" id="searchManto" placeholder="Buscar equipo o detalle...">
+                    </div>
+                    <button class="btn btn-success px-4 rounded-pill shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddManto">Registrar</button>
+                </div>
             </div>
             <div class="card card-custom overflow-hidden">
                 <table class="table align-middle m-0" id="tableManto">
@@ -1156,8 +1184,12 @@ document.addEventListener('keyup', function (e) {
         // Inicializar buscadores
         setupSearch('searchTickets', '#tableTickets tbody tr', true);
         setupSearch('searchInventario', '#tableInventario tbody tr', true);
-        setupSearch('searchBoveda', '.card-item', false);
-        setupSearch('searchWiki', '.wiki-item', false);
+        
+        // 🛠️ SOLUCIÓN: IDs actualizados para Bóveda y Wiki
+        setupSearch('buscadorBoveda', '#bovedaCards .card-item', false);
+        setupSearch('buscadorWiki', '#wikiCards .wiki-item', false);
+        setupSearch('searchPrestamos', '#tablePrestamos tbody tr', true);
+        setupSearch('searchManto', '#tableManto tbody tr', true);
         
         // Ejecutar resaltado inicial
         resaltarAlertasSoftware();
