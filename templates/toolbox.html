@@ -259,7 +259,9 @@
                 <i class="fas fa-search position-absolute" style="left:12px; top:12px; color:#94a3b8;"></i>
                 <input type="text" class="form-control search-input" id="searchTickets" placeholder="Buscar ticket...">
             </div>
-            <button class="btn btn-primary rounded-pill px-4 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddTicket">Nuevo Reporte</button>
+            <button class="btn btn-primary px-4 rounded-pill shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddTicket">
+                <i class="fas fa-plus me-1"></i> Nuevo Reporte
+            </button>
         </div>
     </div>
     <div class="card card-custom overflow-hidden">
@@ -363,7 +365,9 @@
                 <i class="fas fa-search position-absolute" style="left:12px; top:12px; color:#94a3b8;"></i>
                 <input type="text" class="form-control search-input" id="searchInventario" placeholder="Buscar equipo...">
             </div>
-            <button class="btn btn-primary px-4 rounded-pill shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddEquip">Agregar Activo</button>
+            <button class="btn btn-primary px-4 rounded-pill shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddEquip">
+                <i class="fas fa-plus me-1"></i> Agregar Activo
+            </button>
         </div>
     </div>
     <div class="card card-custom p-0 overflow-hidden">
@@ -525,9 +529,9 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h3 class="fw-bold">Control de Gastos Mensuales</h3>
                 <div class="d-flex gap-3">
-                    <div class="input-group" style="width: 300px;">
-                        <span class="input-group-text bg-white border-end-0 rounded-pill-start shadow-sm"><i class="fas fa-search text-muted"></i></span>
-                        <input type="text" id="searchGastos" class="form-control border-start-0 rounded-pill-end shadow-sm" placeholder="Buscar proveedor...">
+                    <div class="position-relative">
+                        <i class="fas fa-search position-absolute" style="left:12px; top:12px; color:#94a3b8;"></i>
+                        <input type="text" class="form-control search-input" id="searchGastos" placeholder="Buscar proveedor...">
                     </div>
                     <button class="btn btn-warning px-4 rounded-pill shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddGasto">
                         <i class="fas fa-plus me-1"></i> Nuevo Gasto
@@ -593,11 +597,13 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3>Bóveda Claves</h3>
         <div class="d-flex gap-3 align-items-center">
-            <div class="input-group shadow-sm" style="max-width: 250px;">
-                <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
-                <input type="text" class="form-control border-start-0" id="buscadorBoveda" placeholder="Buscar servicio o usuario...">
+            <div class="position-relative">
+                <i class="fas fa-search position-absolute" style="left:12px; top:12px; color:#94a3b8;"></i>
+                <input type="text" class="form-control search-input" id="buscadorBoveda" placeholder="Buscar servicio o usuario...">
             </div>
-            <button class="btn btn-danger rounded-pill px-4 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddClave">Nueva Clave</button>
+            <button class="btn btn-danger px-4 rounded-pill shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddClave">
+                   <i class="fas fa-plus me-1"></i> Nueva Clave
+            </button>
         </div>
     </div>
     
@@ -627,11 +633,13 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3>Préstamos</h3>
         <div class="d-flex gap-3 align-items-center">
-            <div class="input-group shadow-sm" style="max-width: 250px;">
-                <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
-                <input type="text" class="form-control border-start-0" id="searchPrestamos" placeholder="Buscar artículo o usuario...">
+            <div class="position-relative">
+                <i class="fas fa-search position-absolute" style="left:12px; top:12px; color:#94a3b8;"></i>
+                <input type="text" class="form-control search-input" id="searchPrestamos" placeholder="Buscar artículo o usuario...">
             </div>
-            <button class="btn btn-info text-white rounded-pill px-4 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddPrestamo">Registrar Salida</button>
+            <button class="btn btn-info px-4 rounded-pill shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddPrestamo">
+                <i class="fas fa-plus me-1"></i>Registrar Salida
+            </button>
         </div>
     </div>
     <div class="card card-custom p-0 overflow-hidden">
@@ -658,11 +666,13 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3>Wiki Técnica</h3>
         <div class="d-flex gap-3 align-items-center">
-            <div class="input-group shadow-sm" style="max-width: 300px;">
-                <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
-                <input type="text" class="form-control border-start-0" id="buscadorWiki" placeholder="Buscar categoría o título...">
+            <div class="position-relative">
+                <i class="fas fa-search position-absolute" style="left:12px; top:12px; color:#94a3b8;"></i>
+                <input type="text" class="form-control search-input" id="buscadorWiki" placeholder="Buscar categoría o título...">
             </div>
-            <button class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalAddWiki">Nueva Guía</button>
+            <button class="btn btn-primary px-4 rounded-pill shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddWiki">
+                <i class="fas fa-plus me-1"></i> Nueva Guía
+            </button>
         </div>
     </div>
     
@@ -690,11 +700,13 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h3>Mantenimiento</h3>
                 <div class="d-flex gap-3 align-items-center">
-                    <div class="input-group shadow-sm" style="max-width: 250px;">
-                        <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
-                        <input type="text" class="form-control border-start-0" id="searchManto" placeholder="Buscar equipo o detalle...">
+                    <div class="position-relative">
+                       <i class="fas fa-search position-absolute" style="left:12px; top:12px; color:#94a3b8;"></i>
+                       <input type="text" class="form-control search-input" id="searchManto" placeholder="Buscar equipo o detalle...">
                     </div>
-                    <button class="btn btn-success px-4 rounded-pill shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddManto">Registrar</button>
+                    <button class="btn btn-success px-4 rounded-pill shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddManto">
+                        <i class="fas fa-plus me-1"></i>Registrar
+                    </button>
                 </div>
             </div>
             <div class="card card-custom overflow-hidden">
