@@ -57,7 +57,7 @@ app.secret_key = 'it_toolbox_secure_key_2025'
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'descargas')
 
-SOFTWARE_PROHIBIDO = ["Torrent", "Steam", "Spotify", "Netflix", "AnyDesk", "TeamViewer"]
+SOFTWARE_PROHIBIDO = ["Torrent", "Steam", "Spotify", "Netflix", "AnyDesk"]
 
 def conectar_db():
     # Esto asegura que busque la DB en la misma carpeta donde está app.py
@@ -76,71 +76,101 @@ def login_required(f):
 # --- RUTA DEL AGENTE (HARDWARE + SOFTWARE) ---
 @app.route('/reporte_agente', methods=['POST'])
 def reporte_agente():
-    data = request.json
-    hostname = data.get('equipo')
-    usuario = data.get('usuario')
-    fecha_hoy = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d")
-    ahora_full = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d %H:%M:%S")
-    
-    # Formato de diagnóstico para la tabla de Incidencias
-    diagnostico_tecnico = f"🧠 {data.get('ram_uso')} | 💾 {data.get('disco_libre')}"
-    
-    # Lógica de Software Prohibido
-    software_instalado = data.get('software', [])
-    prohibidos = ["TeamViewer", "AnyDesk", "AeroAdmin", "Torrent", "Steam", "Spotify"]
-    hallazgos = [s['nombre'] for s in software_instalado if any(p in s['nombre'] for p in prohibidos)]
-    
-    if hallazgos:
-        diagnostico_tecnico = f"🚨 PROHIBIDO: {', '.join(hallazgos)} | " + diagnostico_tecnico
+    try:
+        data = request.json
+        hostname = data.get('equipo')
+        usuario = data.get('usuario')
+        fecha_hoy = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d")
+        ahora_full = datetime.now(pytz.utc).astimezone(zona_mx).strftime("%Y-%m-%d %H:%M:%S")
 
-    conn = conectar_db()
-    cursor = conn.cursor()
+        # Formato de diagnóstico para la tabla de Incidencias
+        diagnostico_tecnico = f"🧠 {data.get('ram_uso')} | 💾 {data.get('disco_libre')}"
 
-    cursor.execute("SELECT correo FROM inventario WHERE nombre_equipo = ?", (hostname,))
-    equipo_existente = cursor.fetchone()
+        # Lógica de Software Prohibido
+        software_instalado = data.get('software', [])
+        prohibidos = ["AnyDesk", "AeroAdmin", "Torrent", "Steam", "Spotify"]
+        hallazgos = []
+        for s in software_instalado:
+            # Validación de seguridad: Asegurar que el nombre del software no sea None
+            nombre_sw = str(s.get('nombre', '')).strip() if s.get('nombre') else ""
+            if any(p.lower() in nombre_sw.lower() for p in prohibidos):
+                hallazgos.append(nombre_sw)
 
-    # Combinamos RAM, Disco y Procesador para las Especificaciones
-    specs = f"RAM: {data.get('ram_total')} | Disco: {data.get('disco_total')} | CPU: {data.get('procesador')}"
+        if hallazgos:
+            diagnostico_tecnico = f"🚨 PROHIBIDO: {', '.join(hallazgos)} | " + diagnostico_tecnico
 
-    if not equipo_existente:
-        # INSERT con los nombres de campos que envía el nuevo agente
+        conn = conectar_db()
+        cursor = conn.cursor()
+
+        # 1. ACTUALIZAR O INSERTAR INVENTARIO (HARDWARE)
+        cursor.execute("SELECT correo FROM inventario WHERE nombre_equipo = ?", (hostname,))
+        equipo_existente = cursor.fetchone()
+
+        specs = f"RAM: {data.get('ram_total')} | Disco: {data.get('disco_total')} | CPU: {data.get('procesador')}"
+
+        if not equipo_existente:
+            cursor.execute("""
+                INSERT INTO inventario
+                (nombre_equipo, usuario, especificaciones, fecha_asignacion, ip_address, mac_address, n_serie, modelo, marca, correo)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                hostname, usuario, specs,
+                fecha_hoy, data.get('ip'), data.get('mac'), data.get('serie'), data.get('modelo'), data.get('marca'), ""
+            ))
+            correo_destino = ""
+        else:
+            cursor.execute("""
+                UPDATE inventario SET
+                ip_address=?, mac_address=?, especificaciones=?, usuario=?
+                WHERE nombre_equipo=?
+            """, (data.get('ip'), data.get('mac'), specs, usuario, hostname))
+            correo_destino = equipo_existente['correo'] if equipo_existente['correo'] else ""
+
+        # 2. CREAR INCIDENCIA AUTOMÁTICA
         cursor.execute("""
-            INSERT INTO inventario 
-            (nombre_equipo, usuario, especificaciones, fecha_asignacion, ip_address, mac_address, n_serie, modelo, marca, correo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            hostname, usuario, specs, 
-            fecha_hoy, data.get('ip'), data.get('mac'), data.get('serie'), data.get('modelo'), data.get('marca'), ""
-        ))
+            INSERT INTO incidencias
+            (usuario, equipo, problema, solucion, falla_humana, fecha_registro, correo_usuario)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (usuario, hostname, diagnostico_tecnico, 'Pendiente', '-', ahora_full, correo_destino))
+
+        # 3. 🛠️ EL BLOQUE FALTANTE: INSERTAR EL SOFTWARE 🛠️
+        if software_instalado:
+            # Primero borramos el software viejo de este equipo para evitar duplicados infinitos
+            cursor.execute("DELETE FROM software_inventario WHERE nombre_equipo = ?", (hostname,))
+            
+            # Preparamos la lista para insertar de golpe (Bulk Insert para que sea rápido)
+            tuplas_sw = []
+            for app in software_instalado:
+                nombre = str(app.get('nombre', '')).strip()[:100] # Truncamos a 100 caracteres por seguridad de la BD
+                version = str(app.get('version', 'N/A')).strip()[:50]
+                if nombre: # Si el nombre no está vacío, lo agregamos
+                    tuplas_sw.append((hostname, nombre, version))
+            
+            # Insertamos todos los programas
+            if tuplas_sw:
+                cursor.executemany("""
+                    INSERT INTO software_inventario (nombre_equipo, nombre_software, version)
+                    VALUES (?, ?, ?)
+                """, tuplas_sw)
+
         conn.commit()
-        correo_destino = ""
-    else:
-        # UPDATE: Si ya existe, actualizamos los datos técnicos por si hubo un upgrade (RAM, IP, etc)
-        cursor.execute("""
-            UPDATE inventario SET 
-            ip_address=?, mac_address=?, especificaciones=?, usuario=? 
-            WHERE nombre_equipo=?
-        """, (data.get('ip'), data.get('mac'), specs, usuario, hostname))
-        correo_destino = equipo_existente[0]
+        conn.close()
+        return {"status": "success"}, 200
 
-    # Crear la Incidencia
-    cursor.execute("""
-        INSERT INTO incidencias 
-        (usuario, equipo, problema, solucion, falla_humana, fecha_registro, correo_usuario)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (usuario, hostname, diagnostico_tecnico, 'Pendiente', '-', ahora_full, correo_destino))
-    
-    conn.commit()
-    conn.close()
-    return {"status": "success"}, 200
+    except Exception as e:
+        print(f"Error crítico en reporte_agente: {e}")
+        return {"status": "error", "message": str(e)}, 500
 
 # --- CONSULTA SOFTWARE ---
 @app.route('/ver_software/<hostname>')
 @login_required
 def ver_software(hostname):
-    conn = conectar_db(); cursor = conn.cursor()
+    conn = conectar_db()
+    cursor = conn.cursor()
     cursor.execute("SELECT * FROM software_inventario WHERE nombre_equipo = ? ORDER BY nombre_software ASC", (hostname,))
-    sw = [dict(ix) for ix in cursor.fetchall()]; conn.close(); return jsonify(sw)
+    sw = [dict(ix) for ix in cursor.fetchall()]
+    conn.close()
+    return jsonify(sw)
 
 # --- DASHBOARD PRINCIPAL ---
 @app.route('/')
