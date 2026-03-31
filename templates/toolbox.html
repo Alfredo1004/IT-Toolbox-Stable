@@ -416,7 +416,16 @@
                         <div class="col-md-4"><label class="small fw-bold">MARCA:</label><input type="text" name="marca" class="form-control" value="{{e.marca or ''}}"></div>
                         <div class="col-md-4"><label class="small fw-bold">MODELO:</label><input type="text" name="modelo" class="form-control" value="{{e.modelo or ''}}"></div>
                         <div class="col-md-4"><label class="small fw-bold">SERIE:</label><input type="text" name="serie" class="form-control" value="{{e.n_serie or ''}}"></div>
-                        <div class="col-md-6"><label class="small fw-bold">UBICACIÓN:</label><input type="text" name="ubicacion" class="form-control" value="{{e.ubicacion or ''}}"></div>
+                        <div class="col-md-6">
+                            <label class="small fw-bold">UBICACIÓN:</label>
+                            <select name="ubicacion" class="form-select">
+                                <option value="Monterrey" {{ 'selected' if e.ubicacion == 'Monterrey' }}>Monterrey</option>
+                                <option value="Guadalajara" {{ 'selected' if e.ubicacion == 'Guadalajara' }}>Guadalajara</option>
+                                <option value="Saltillo" {{ 'selected' if e.ubicacion == 'Saltillo' }}>Saltillo</option>
+                                <option value="Aguascalientes" {{ 'selected' if e.ubicacion == 'Aguascalientes' }}>Aguascalientes</option>
+                                <option value="Querétaro" {{ 'selected' if e.ubicacion == 'Querétaro' }}>Querétaro</option>
+                            </select>
+                        </div>
                         <div class="col-md-6"><label class="small fw-bold">FECHA:</label><input type="date" name="fecha_asig" class="form-control" value="{{e.fecha_asignacion}}"></div>
                         <div class="col-md-6"><label class="small fw-bold">IP LOCAL:</label><input type="text" name="ip" class="form-control" value="{{e.ip_address}}"></div>
                         <div class="col-md-6"><label class="small fw-bold">RED:</label><select name="red" class="form-select"><option value="Ethernet" {{'selected' if e.tipo_red=='Ethernet'}}>Ethernet</option><option value="Wi-Fi" {{'selected' if e.tipo_red=='Wi-Fi'}}>Wi-Fi</option></select></div>
@@ -498,7 +507,16 @@
                         <div class="col-md-6"><label class="small fw-bold">MARCA / MODELO:</label><input type="text" name="marca_modelo" class="form-control" value="{{c.marca_modelo}}" required></div>
                         <div class="col-md-6"><label class="small fw-bold">NÚMERO:</label><input type="text" name="numero_tel" class="form-control" value="{{c.numero_tel or ''}}"></div>
                         <div class="col-12"><label class="small fw-bold">IMEI:</label><input type="text" name="imei" class="form-control" value="{{c.imei or ''}}"></div>
-                        <div class="col-12"><label class="small fw-bold">UBICACIÓN:</label><input type="text" name="ubicacion" class="form-control" value="{{c.ubicacion or ''}}"></div>
+                        <div class="col-12">
+                            <label class="small fw-bold">UBICACIÓN:</label>
+                            <select name="ubicacion" class="form-select">
+                                <option value="Monterrey" {{ 'selected' if c.ubicacion == 'Monterrey' }}>Monterrey</option>
+                                <option value="Guadalajara" {{ 'selected' if c.ubicacion == 'Guadalajara' }}>Guadalajara</option>
+                                <option value="Saltillo" {{ 'selected' if c.ubicacion == 'Saltillo' }}>Saltillo</option>
+                                <option value="Aguascalientes" {{ 'selected' if c.ubicacion == 'Aguascalientes' }}>Aguascalientes</option>
+                                <option value="Querétaro" {{ 'selected' if c.ubicacion == 'Querétaro' }}>Querétaro</option>
+                            </select>
+                        </div>
                         <div class="col-12"><label class="small fw-bold">COMENTARIOS:</label><textarea name="comentarios" class="form-control" rows="2">{{c.comentarios or ''}}</textarea></div>
                     </div>
                     <hr class="my-4">
@@ -790,9 +808,9 @@
             <form action="/agregar_clave" method="POST" class="modal-content">
                 <div class="modal-header bg-danger text-white"><h5>Nueva Clave</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body p-4">
-                    <label class="small fw-bold">SERVICIO:</label><input type="text" name="servicio" class="form-control mb-3" required>
-                    <label class="small fw-bold">USER:</label><input type="text" name="usuario" class="form-control mb-3" required>
-                    <label class="small fw-bold">PASS:</label><input type="text" name="password" class="form-control mb-3" required>
+                    <label class="small fw-bold">Usuario:</label><input type="text" name="servicio" class="form-control mb-3" required>
+                    <label class="small fw-bold">Correo:</label><input type="text" name="usuario" class="form-control mb-3" required>
+                    <label class="small fw-bold">Pass:</label><input type="text" name="password" class="form-control mb-3" required>
                     <label class="small fw-bold">URL:</label><input type="text" name="url" class="form-control">
                 </div>
                 <div class="modal-footer"><button type="submit" class="btn btn-danger w-100 rounded-pill">Guardar</button></div>
@@ -986,8 +1004,14 @@
                         <input type="text" name="serie" class="form-control">
                     </div>
                     <div class="col-md-6">
-                        <label class="small fw-bold">UBICACIÓN:</label>
-                        <input type="text" name="ubicacion" class="form-control">
+                         <label class="small fw-bold">UBICACIÓN:</label>
+                         <select name="ubicacion" class="form-select">
+                            <option value="Monterrey">Monterrey</option>
+                            <option value="Guadalajara">Guadalajara</option>
+                            <option value="Saltillo">Saltillo</option>
+                            <option value="Aguascalientes">Aguascalientes</option>
+                            <option value="Querétaro">Querétaro</option>
+                         </select>
                     </div>
                     <div class="col-md-6">
                         <label class="small fw-bold">FECHA ASIGNACIÓN:</label>
@@ -1048,9 +1072,15 @@
                         <label class="small fw-bold">FECHA ASIGNACIÓN:</label>
                         <input type="date" name="fecha_asig" class="form-control">
                     </div>
-                    <div class="col-md-12"> 
-                        <label class="small fw-bold">UBICACIÓN:</label>
-                        <input type="text" name="ubicacion" class="form-control" placeholder="Ej. Monterrey">
+                    <div class="col-md-6">
+                       <label class="small fw-bold">UBICACIÓN:</label>
+                       <select name="ubicacion" class="form-select">
+                           <option value="Monterrey">Monterrey</option>
+                           <option value="Guadalajara">Guadalajara</option>
+                           <option value="Saltillo">Saltillo</option>
+                           <option value="Aguascalientes">Aguascalientes</option>
+                           <option value="Querétaro">Querétaro</option>
+                        </select>
                     </div>
                     <div class="col-12">
                         <label class="small fw-bold">COMENTARIOS:</label>
@@ -1299,9 +1329,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (isMobile) {
             // En móvil, si tiene 'active' está visible, si no, está oculto
             if (sidebar.classList.contains('active')) {
-                btnText.innerText = "Mostrar Menú";
-            } else {
                 btnText.innerText = "Ocultar Menú";
+            } else {
+                btnText.innerText = "Mostrar Menú";
             }
         } else {
             // En PC, si tiene 'collapsed' está oculto, si no, está visible
