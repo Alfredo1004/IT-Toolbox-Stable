@@ -437,11 +437,16 @@
                         <table class="table table-sm table-hover mb-0" style="font-size: 0.7rem;">
                             <thead><tr class="text-muted"><th>FECHA</th><th>ANTERIOR</th><th>NUEVO</th></tr></thead>
                             <tbody>
-                                {% set encontrado = false %}
-                                {% for h in historial %}{% if h.id_activo == e.id and h.tipo_activo == 'Laptop' %}
-                                <tr><td>{{ h.fecha_cambio[:10] }}</td><td>{{ h.usuario_anterior }}</td><td class="text-primary fw-bold">{{ h.usuario_nuevo }}</td></tr>
-                                {% set encontrado = true %}{% endif %}{% endfor %}
-                                {% if not encontrado %}<tr><td colspan="3" class="text-center py-2 text-muted small italic">Sin cambios previos.</td></tr>{% endif %}
+                                {% set flag_eq = namespace(hallado=false) %}
+                                {% for h in historial %}
+                                    {% if h.id_activo == e.id and h.tipo_activo == 'Laptop' %}
+                                        <tr><td>{{ h.fecha_cambio[:10] }}</td><td>{{ h.usuario_anterior }}</td><td class="text-primary fw-bold">{{ h.usuario_nuevo }}</td></tr>
+                                        {% set flag_eq.hallado = true %}
+                                    {% endif %}
+                                {% endfor %}
+                                {% if not flag_eq.hallado %}
+                                    <tr><td colspan="3" class="text-center py-2 text-muted small italic">Sin cambios previos.</td></tr>
+                                {% endif %}
                             </tbody>
                         </table>
                     </div>
@@ -502,12 +507,14 @@
             <form action="/actualizar_celular/{{c.id}}" method="POST" class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-primary text-white"><h5>Editar Celular: {{c.usuario}}</h5></div>
                 <div class="modal-body p-4">
+                    
                     <div class="row g-3">
                         <div class="col-12"><label class="small fw-bold">USUARIO:</label><input type="text" name="usuario" class="form-control" value="{{c.usuario}}"></div>
                         <div class="col-md-6"><label class="small fw-bold">MARCA / MODELO:</label><input type="text" name="marca_modelo" class="form-control" value="{{c.marca_modelo}}" required></div>
                         <div class="col-md-6"><label class="small fw-bold">NÚMERO:</label><input type="text" name="numero_tel" class="form-control" value="{{c.numero_tel or ''}}"></div>
                         <div class="col-12"><label class="small fw-bold">IMEI:</label><input type="text" name="imei" class="form-control" value="{{c.imei or ''}}"></div>
-                        <div class="col-12">
+                        
+                        <div class="col-md-6">
                             <label class="small fw-bold">UBICACIÓN:</label>
                             <select name="ubicacion" class="form-select">
                                 <option value="Monterrey" {{ 'selected' if c.ubicacion == 'Monterrey' }}>Monterrey</option>
@@ -517,24 +524,36 @@
                                 <option value="Querétaro" {{ 'selected' if c.ubicacion == 'Querétaro' }}>Querétaro</option>
                             </select>
                         </div>
-                        <div class="col-12"><label class="small fw-bold">COMENTARIOS:</label><textarea name="comentarios" class="form-control" rows="2">{{c.comentarios or ''}}</textarea></div>
-                    </div>
-                    <hr class="my-4">
+                        
+                        <div class="col-md-6">
+                            <label class="small fw-bold">FECHA ASIGNACIÓN:</label>
+                            <input type="date" name="fecha_asig" class="form-control" value="{{ c.fecha_asignacion or '' }}">
+                        </div>
+
+                        <div class="col-12">
+                            <label class="small fw-bold">COMENTARIOS:</label>
+                            <textarea name="comentarios" class="form-control" rows="2">{{c.comentarios or ''}}</textarea>
+                        </div>
+                    </div> <hr class="my-4">
                     <h6 class="fw-bold small text-muted mb-2"><i class="fas fa-history me-1"></i> HISTORIAL MÓVIL</h6>
                     <div style="max-height: 100px; overflow-y: auto;">
                         <table class="table table-sm table-hover mb-0" style="font-size: 0.7rem;">
                             <thead><tr class="text-muted"><th>FECHA</th><th>ANTERIOR</th><th>NUEVO</th></tr></thead>
                             <tbody>
-                                {% set hallado_cel = false %}
-                                {% for h in historial %}{% if h.id_activo == c.id and h.tipo_activo == 'Celular' %}
-                                <tr><td>{{ h.fecha_cambio[:10] }}</td><td>{{ h.usuario_anterior }}</td><td class="text-success fw-bold">{{ h.usuario_nuevo }}</td></tr>
-                                {% set hallado_cel = true %}{% endif %}{% endfor %}
-                                {% if not hallado_cel %}<tr><td colspan="3" class="text-center py-2 text-muted small italic">Sin movimientos previos.</td></tr>{% endif %}
+                                {% set flag_cel = namespace(hallado=false) %}
+                                {% for h in historial %}
+                                    {% if h.id_activo == c.id and h.tipo_activo == 'Celular' %}
+                                        <tr><td>{{ h.fecha_cambio[:10] }}</td><td>{{ h.usuario_anterior }}</td><td class="text-success fw-bold">{{ h.usuario_nuevo }}</td></tr>
+                                        {% set flag_cel.hallado = true %}
+                                    {% endif %}
+                                {% endfor %}
+                                {% if not flag_cel.hallado %}
+                                    <tr><td colspan="3" class="text-center py-2 text-muted small italic">Sin movimientos previos.</td></tr>
+                                {% endif %}
                             </tbody>
                         </table>
                     </div>
-                </div>
-                <div class="modal-footer bg-light"><button type="submit" class="btn btn-primary w-100 rounded-pill shadow">Actualizar Datos</button></div>
+                </div> <div class="modal-footer bg-light"><button type="submit" class="btn btn-primary w-100 rounded-pill shadow">Actualizar Datos</button></div>
             </form>
         </div>
     </div>
