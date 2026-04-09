@@ -605,7 +605,7 @@ def descargar_reporte_excel():
 
 @app.route('/agregar_celular', methods=['POST'])
 def agregar_celular():
-    # 1. Recibimos los 7 campos exactamente como se llaman en el HTML
+    # 1. Recibimos los 7 campos
     usuario = request.form.get('usuario') or 'STOCK'
     marca_modelo = request.form.get('marca_modelo')
     numero_tel = request.form.get('numero_tel')
@@ -614,29 +614,59 @@ def agregar_celular():
     ubicacion = request.form.get('ubicacion')
     comentarios = request.form.get('comentarios')
 
-    conn = conectar_db()
-    cursor = conn.cursor()
-    
-    # 2. Insertamos los 7 valores con 7 signos de interrogación (?, ?, ?, ?, ?, ?, ?)
-    cursor.execute("""
-        INSERT INTO celulares 
-        (usuario, marca_modelo, numero_tel, imei, fecha_asignacion, ubicacion, comentarios) 
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (usuario, marca_modelo, numero_tel, imei, fecha_asig, ubicacion, comentarios))
-    
-    # 3. Opcional pero recomendado: Registrar en el historial que se ingresó un equipo nuevo
-    id_nuevo = cursor.lastrowid
-    cursor.execute("""
-        INSERT INTO historial_asignaciones 
-        (tipo_activo, id_activo, usuario_anterior, usuario_nuevo, detalles) 
-        VALUES (?, ?, ?, ?, ?)
-    """, ('Celular', id_nuevo, 'NUEVO INGRESO', usuario, 'Alta de equipo móvil en sistema'))
+    conn = None
+    try:
+        conn = conectar_db()
+        cursor = conn.cursor()
+        
+        # 🛡️ NUEVO FILTRO LÓGICO: Verificar si el teléfono ya existe
+        if numero_tel: 
+            cursor.execute("SELECT id FROM celulares WHERE numero_tel = ?", (numero_tel,))
+            if cursor.fetchone(): 
+                # USAMOS FLASH EN LUGAR DEL SCRIPT
+                flash(f'⚠️ ERROR: El Número de Teléfono {numero_tel} ya está registrado en otro equipo.', 'danger')
+                return redirect(url_for('dashboard', tab='celulares'))
 
-    conn.commit()
-    conn.close()
+        # 2. Intentamos Insertar
+        cursor.execute("""
+            INSERT INTO celulares 
+            (usuario, marca_modelo, numero_tel, imei, fecha_asignacion, ubicacion, comentarios) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (usuario, marca_modelo, numero_tel, imei, fecha_asig, ubicacion, comentarios))
+        
+        # 3. Registrar en el historial
+        id_nuevo = cursor.lastrowid
+        cursor.execute("""
+            INSERT INTO historial_asignaciones 
+            (tipo_activo, id_activo, usuario_anterior, usuario_nuevo, detalles) 
+            VALUES (?, ?, ?, ?, ?)
+        """, ('Celular', id_nuevo, 'NUEVO INGRESO', usuario, 'Alta de equipo móvil en sistema'))
+
+        # Si todo salió bien, guardamos los cambios
+        conn.commit()
+        return redirect(url_for('dashboard', tab='celulares'))
+        
+    # 🛡️ ESCUDO 1: Atrapa el duplicado (IMEI)
+    except sqlite3.IntegrityError:
+        if conn: 
+            conn.rollback() 
+        flash('⚠️ ERROR DE DUPLICADO: El IMEI que intentas registrar ya existe en el sistema.', 'danger')
+        return redirect(url_for('dashboard', tab='celulares'))
+                  
+    # 🛡️ ESCUDO 2: Atrapa otros errores
+    except Exception as e:
+        if conn: 
+            conn.rollback()
+        flash(f'⚠️ Error interno del servidor: {str(e)}', 'danger')
+        return redirect(url_for('dashboard', tab='celulares'))
+                  
+    # 🧹 LIMPIEZA OBLIGATORIA: Pase lo que pase, cerramos la base de datos
+    finally:
+        if conn:
+            conn.close()
     
     # Retornamos a la pestaña de celulares
-    return redirect(url_for('dashboard', tab='celulares'))
+    
 
 @app.route('/actualizar_celular/<int:id>', methods=['POST'])
 @login_required
@@ -649,28 +679,59 @@ def actualizar_celular(id):
     ubicacion = request.form.get('ubicacion')
     comentarios = request.form.get('comentarios')
     
-    conn = conectar_db(); cursor = conn.cursor()
-    
-    # 1. Consultar el antiguo dueño
-    cursor.execute("SELECT usuario FROM celulares WHERE id=?", (id,))
-    res = cursor.fetchone()
-    antiguo = res[0] if res else "Desconocido"
+    conn = None
+    try:
+        conn = conectar_db()
+        cursor = conn.cursor()
+        
+       # 🛡️ NUEVO FILTRO LÓGICO: Verificar si el teléfono ya lo tiene OTRO celular
+        if numero_tel:
+            cursor.execute("SELECT id FROM celulares WHERE numero_tel = ? AND id != ?", (numero_tel, id))
+            if cursor.fetchone():
+                flash(f'⚠️ ERROR AL ACTUALIZAR: El Número de Teléfono {numero_tel} ya le pertenece a otro celular en el inventario.', 'warning')
+                return redirect(url_for('dashboard', tab='celulares'))
 
-    # 2. Registrar historial si hay cambio
-    if antiguo != nuevo_usuario:
-        cursor.execute("""INSERT INTO historial_asignaciones 
-            (tipo_activo, id_activo, usuario_anterior, usuario_nuevo, detalles) 
-            VALUES (?, ?, ?, ?, ?)""", 
-            ('Celular', id, antiguo, nuevo_usuario, 'Cambio de equipo móvil'))
+        # 1. Consultar el antiguo dueño
+        cursor.execute("SELECT usuario FROM celulares WHERE id=?", (id,))
+        res = cursor.fetchone()
+        antiguo = res[0] if res else "Desconocido"
 
-    # 3. Actualizar datos del celular
-    cursor.execute("""UPDATE celulares SET 
-                    usuario=?, marca_modelo=?, imei=?, numero_tel=?, fecha_asignacion=?, ubicacion=?, comentarios=? 
-                    WHERE id=?""", 
-                    (nuevo_usuario, marca_modelo, imei, numero_tel, fecha_asignacion, ubicacion, comentarios, id))
+        # 2. Registrar historial si hay cambio
+        if antiguo != nuevo_usuario:
+            cursor.execute("""INSERT INTO historial_asignaciones 
+                (tipo_activo, id_activo, usuario_anterior, usuario_nuevo, detalles) 
+                VALUES (?, ?, ?, ?, ?)""", 
+                ('Celular', id, antiguo, nuevo_usuario, 'Cambio de equipo móvil'))
+
+        # 3. Actualizar datos del celular
+        cursor.execute("""UPDATE celulares SET 
+                            usuario=?, marca_modelo=?, imei=?, numero_tel=?, fecha_asignacion=?, ubicacion=?, comentarios=? 
+                            WHERE id=?""", 
+                            (nuevo_usuario, marca_modelo, imei, numero_tel, fecha_asignacion, ubicacion, comentarios, id))
+        
+        # Guardamos cambios si todo es correcto
+        conn.commit()
+        return redirect(url_for('dashboard', tab='celulares'))
+
+    # 🛡️ ESCUDO 1: Atrapa el duplicado al intentar editar (IMEI)
+    except sqlite3.IntegrityError:
+        if conn: 
+            conn.rollback() 
+        flash('⚠️ ERROR AL ACTUALIZAR: El IMEI que ingresaste ya le pertenece a otro celular registrado en el inventario.', 'warning')
+        return redirect(url_for('dashboard', tab='celulares'))
+                  
+    # 🛡️ ESCUDO 2: Atrapa cualquier otro error de sistema
+    except Exception as e:
+        if conn: 
+            conn.rollback()
+        flash(f'⚠️ Error interno del servidor: {str(e)}', 'danger')
+        return redirect(url_for('dashboard', tab='celulares'))
+                  
+    # 🧹 LIMPIEZA OBLIGATORIA: Siempre cerramos la conexión
+    finally:
+        if conn:
+            conn.close()
     
-    conn.commit(); conn.close()
-    return redirect(url_for('dashboard', tab='celulares'))
 
 @app.route('/eliminar_celular/<int:id>')
 @login_required
