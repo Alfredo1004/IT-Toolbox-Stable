@@ -15,3 +15,5 @@ venv/
 
 # Reportes temporales
 *.xlsx
+
+iniciar.bat

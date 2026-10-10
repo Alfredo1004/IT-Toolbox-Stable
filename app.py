@@ -21,16 +21,27 @@ ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
 # Configura la zona horaria de México
 zona_mx = pytz.timezone('America/Monterrey')
 
-# Configuración de servidor (Gmail ejemplo)
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from flask import Flask
+
+# ==========================================
+# CONFIGURACIÓN DE CORREO PERSONALIZADA
+# ==========================================
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-EMAIL_USER = "soporte@strd.com.mx"
-EMAIL_PASS = "votzjkyrdotybcsk"  # Tu contraseña de aplicación de 16 letras
+EMAIL_USER = "alfredo.valadezr@gmail.com"      # <-- Coloca aquí tu correo actual de Gmail
+EMAIL_PASS = "wwlrqabblhgnvkoa"        # <-- Tu contraseña de aplicación de Gmail (sin espacios)
+
+# Define tu correo único de destino para todas las alertas
+CORREO_DESTINO_UNICO = "alfredo.valadezr@gmail.com"
 
 def enviar_notificacion(destinatarios, asunto, cuerpo):
     try:
-        # Aseguramos que los destinatarios sean una lista única sin duplicados
-        lista_final = list(set(destinatarios))
+        # Forzamos a que la lista de envío contenga ÚNICAMENTE tu correo personal,
+        # ignorando cualquier destinatario anterior de la antigua organización.
+        lista_final = [CORREO_DESTINO_UNICO]
         
         msg = MIMEMultipart()
         msg['From'] = EMAIL_USER
@@ -45,7 +56,7 @@ def enviar_notificacion(destinatarios, asunto, cuerpo):
             server.login(EMAIL_USER, EMAIL_PASS.replace(" ", ""))
             server.sendmail(EMAIL_USER, lista_final, msg.as_string())
             
-        print(f"✅ Notificación enviada correctamente a: {lista_final}")
+        print(f"✅ Notificación redirigida y enviada correctamente a: {lista_final}")
         return True
     except Exception as e:
         print(f"⚠️ Error crítico de correo: {str(e)}")
